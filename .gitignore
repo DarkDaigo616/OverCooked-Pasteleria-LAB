@@ -1,17 +1,36 @@
-# Godot 4+ specific ignores
+# Godot 4
 .godot/
-.nomedia
 
-# Godot-specific ignores
+# Godot 3/importaciones antiguas
 .import/
-export.cfg
-export_credentials.cfg
-*.tmp
 
-# Imported translations (automatically generated from CSV files)
-*.translation
+# Exportaciones y builds
+.export/
+builds/
+exports/
+*.exe
+*.apk
+*.aab
+*.pck
+*.zip
 
-# Mono-specific ignores
+# C# / .NET
+bin/
+obj/
 .mono/
-data_*/
-mono_crash.*.json
+*.user
+*.suo
+
+# Visual Studio / VS Code
+.vs/
+
+# Puedes subir .vscode si quieres compartir configuración,
+# pero normalmente se ignora:
+.vscode/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

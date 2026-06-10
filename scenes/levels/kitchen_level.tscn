@@ -1,0 +1,177 @@
+[gd_scene load_steps=9 format=3 uid="uid://bey48kx5hteil"]
+
+[ext_resource type="Script" uid="uid://qk5e1dqspx3g" path="res://scripts/kitchen_level.gd" id="1_level"]
+[ext_resource type="PackedScene" uid="uid://c136c5qvhhql0" path="res://scenes/player/chef_player.tscn" id="2_player"]
+[ext_resource type="Script" uid="uid://g2nua1r3h0lp" path="res://scripts/game_manager.gd" id="3_gm"]
+[ext_resource type="Script" uid="uid://cbs7w0valhpf5" path="res://scripts/order_manager.gd" id="4_om"]
+[ext_resource type="Script" uid="uid://cfxyai0ju1kr7" path="res://scripts/game_hud.gd" id="5_hud"]
+[ext_resource type="ArrayMesh" uid="uid://c5b1nqoakmwks" path="res://assets/{models,textures,sounds}/KayKit_Restaurant_Bits_1.0_FREE/Assets/obj/floor_kitchen.obj" id="6_floor"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_floor"]
+size = Vector3(36, 0.2, 36)
+
+[sub_resource type="Environment" id="Environment_main"]
+background_mode = 1
+background_color = Color(0.35, 0.37, 0.42, 1)
+ambient_light_source = 1
+ambient_light_color = Color(0.72, 0.75, 0.82, 1)
+ambient_light_energy = 1.35
+tonemap_mode = 2
+tonemap_exposure = 1.1
+
+[node name="KitchenLevel" type="Node3D"]
+script = ExtResource("1_level")
+
+[node name="GameManager" type="Node" parent="."]
+script = ExtResource("3_gm")
+
+[node name="OrderManager" type="Node" parent="GameManager"]
+script = ExtResource("4_om")
+order_spawn_interval = 35.0
+base_prep_time = 15.0
+
+[node name="GameHUD" type="CanvasLayer" parent="GameManager"]
+script = ExtResource("5_hud")
+
+[node name="MarginContainer" type="MarginContainer" parent="GameManager/GameHUD"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = -20.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="GameManager/GameHUD/MarginContainer"]
+layout_mode = 2
+
+[node name="TopBar" type="HBoxContainer" parent="GameManager/GameHUD/MarginContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="ScoreLabel" type="Label" parent="GameManager/GameHUD/MarginContainer/VBoxContainer/TopBar"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Puntos: 0"
+
+[node name="Spacer" type="Control" parent="GameManager/GameHUD/MarginContainer/VBoxContainer/TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="TimerLabel" type="Label" parent="GameManager/GameHUD/MarginContainer/VBoxContainer/TopBar"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Tiempo: 04:00"
+
+[node name="LevelLabel" type="Label" parent="GameManager/GameHUD/MarginContainer/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "Nivel 1"
+horizontal_alignment = 1
+
+[node name="OrdersPanel" type="PanelContainer" parent="GameManager/GameHUD/MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="GameManager/GameHUD/MarginContainer/VBoxContainer/OrdersPanel"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Title" type="Label" parent="GameManager/GameHUD/MarginContainer/VBoxContainer/OrdersPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.88, 0.95, 1)
+theme_override_font_sizes/font_size = 14
+text = "Ordenes activas"
+
+[node name="OrdersScroll" type="ScrollContainer" parent="GameManager/GameHUD/MarginContainer/VBoxContainer/OrdersPanel/VBoxContainer"]
+custom_minimum_size = Vector2(0, 220)
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="OrdersList" type="VBoxContainer" parent="GameManager/GameHUD/MarginContainer/VBoxContainer/OrdersPanel/VBoxContainer/OrdersScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="InteractionHint" type="Label" parent="GameManager/GameHUD"]
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -400.0
+offset_top = -110.0
+offset_right = 400.0
+offset_bottom = -35.0
+theme_override_colors/font_color = Color(0.9, 0.9, 0.95, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 28
+text = "Acercate a una estacion | E: usar | Q: soltar"
+horizontal_alignment = 1
+
+[node name="GameOverPanel" type="PanelContainer" parent="GameManager/GameHUD"]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -320.0
+offset_top = -220.0
+offset_right = 320.0
+offset_bottom = 220.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="GameManager/GameHUD/GameOverPanel"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="GameManager/GameHUD/GameOverPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 44
+text = "TIEMPO AGOTADO"
+horizontal_alignment = 1
+
+[node name="FinalScoreLabel" type="Label" parent="GameManager/GameHUD/GameOverPanel/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "Puntuacion final: 0"
+horizontal_alignment = 1
+
+[node name="MenuButton" type="Button" parent="GameManager/GameHUD/GameOverPanel/VBoxContainer"]
+layout_mode = 2
+text = "Volver al menu"
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.999793, 0.0176224, -0.0101743, 0.00697675, 0.172816, 0.98493, 0.0191151, -0.984797, 0.172657, 0, 14, 0)
+light_color = Color(1, 0.97, 0.9, 1)
+light_energy = 1.45
+shadow_enabled = true
+
+[node name="Floor" type="StaticBody3D" parent="."]
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor"]
+shape = SubResource("BoxShape3D_floor")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor"]
+transform = Transform3D(9, 0, 0, 0, 1.5, 0, 0, 0, 9, 0, 0, 0)
+mesh = ExtResource("6_floor")
+
+[node name="Walls" type="Node3D" parent="."]
+
+[node name="Decorations" type="Node3D" parent="."]
+
+[node name="Stations" type="Node3D" parent="."]
+
+[node name="ChefPlayer" parent="." instance=ExtResource("2_player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 18, 18)
+projection = 1
+current = true
+size = 24.0
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_main")

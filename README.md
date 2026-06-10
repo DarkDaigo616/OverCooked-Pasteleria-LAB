@@ -102,9 +102,9 @@ OvercookedGame/
 │   └── levels/
 │       └── kitchen_level.tscn
 └── assets/                # Carpeta para tus assets 3D
-    ├── models/
-    ├── textures/
-    └── sounds/
+	├── models/
+	├── textures/
+	└── sounds/
 ```
 
 ## 🎨 Personalización
