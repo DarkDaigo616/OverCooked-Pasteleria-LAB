@@ -4,10 +4,10 @@ class_name ChefPlayer
 const CHEF_MODEL_PATH := "res://assets/{models,textures,sounds}/KayKit_Restaurant_Bits_1.0_FREE/Assets/fbx/Chef.fbx"
 
 @export var speed: float = 5.0
-@export var sprint_speed: float = 8.0
 @export var acceleration: float = 15.0
 @export var friction: float = 12.0
 @export var interact_range: float = 2.8
+@export var click_stop_distance: float = 0.15
 @export var floor_y: float = 1.0
 @export var chef_model_scale: float = 0.42
 @export var chef_model_y_offset: float = 0.0
@@ -19,6 +19,8 @@ var _interactables_in_range: Array[Node3D] = []
 var _level_bounds_half: float = 15.0
 var _spawn_position: Vector3 = Vector3.ZERO
 var _last_target: Node3D = null
+var _move_target: Vector3 = Vector3.ZERO
+var _has_move_target: bool = false
 
 @onready var model = $Model
 @onready var hand_position: Node3D = $Model/HandPosition
@@ -42,6 +44,7 @@ func set_movement_enabled(enabled: bool) -> void:
 	movement_enabled = enabled
 	if not enabled:
 		velocity = Vector3.ZERO
+		_has_move_target = false
 
 
 func _setup_chef_model() -> void:
@@ -87,6 +90,8 @@ func configure_level_bounds(half_size: float, spawn: Vector3) -> void:
 	_level_bounds_half = half_size - 1.2
 	_spawn_position = spawn
 	global_position = spawn
+	_move_target = spawn
+	_has_move_target = false
 	if _spawn_position.y < floor_y:
 		_spawn_position.y = floor_y
 
@@ -109,6 +114,37 @@ func _input(event: InputEvent) -> void:
 		attempt_interaction()
 	if event.is_action_pressed("drop") and held_item:
 		drop_item()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not movement_enabled:
+		return
+	if event is InputEventMouseButton:
+		var mouse_event := event as InputEventMouseButton
+		if mouse_event.button_index == MOUSE_BUTTON_LEFT and mouse_event.pressed:
+			_set_click_move_target(mouse_event.position)
+
+
+func _set_click_move_target(screen_position: Vector2) -> void:
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		return
+
+	var ray_origin := camera.project_ray_origin(screen_position)
+	var ray_direction := camera.project_ray_normal(screen_position)
+	if absf(ray_direction.y) < 0.001:
+		return
+
+	var distance_to_floor := (floor_y - ray_origin.y) / ray_direction.y
+	if distance_to_floor < 0.0:
+		return
+
+	var target := ray_origin + ray_direction * distance_to_floor
+	target.y = floor_y
+	target.x = clampf(target.x, -_level_bounds_half, _level_bounds_half)
+	target.z = clampf(target.z, -_level_bounds_half, _level_bounds_half)
+	_move_target = target
+	_has_move_target = true
 
 
 func _enforce_safe_position() -> void:
@@ -165,14 +201,17 @@ func handle_movement(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, 0, friction * delta)
 		velocity.z = move_toward(velocity.z, 0, friction * delta)
 		return
-	var input_dir := Input.get_vector("move_left", "move_right", "move_up", "move_down")
-	var direction := Vector3(input_dir.x, 0, input_dir.y).normalized()
-	var current_speed := sprint_speed if Input.is_action_pressed("sprint") else speed
 
-	if direction:
-		velocity.x = move_toward(velocity.x, direction.x * current_speed, acceleration * delta)
-		velocity.z = move_toward(velocity.z, direction.z * current_speed, acceleration * delta)
+	var to_target := _move_target - global_position
+	to_target.y = 0.0
+	var distance := to_target.length()
+
+	if _has_move_target and distance > click_stop_distance:
+		var direction := to_target / distance
+		velocity.x = move_toward(velocity.x, direction.x * speed, acceleration * delta)
+		velocity.z = move_toward(velocity.z, direction.z * speed, acceleration * delta)
 	else:
+		_has_move_target = false
 		velocity.x = move_toward(velocity.x, 0, friction * delta)
 		velocity.z = move_toward(velocity.z, 0, friction * delta)
 

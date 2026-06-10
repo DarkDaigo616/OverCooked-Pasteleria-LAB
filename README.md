@@ -4,9 +4,8 @@
 Este es un juego estilo Overcooked creado en Godot 4.x donde controlas a un chef que debe completar órdenes de comida antes de que se acabe el tiempo.
 
 ## 🎮 Controles
-- **WASD o Flechas**: Mover al chef
+- **Click izquierdo**: Mover al chef al punto clickeado
 - **E o Espacio**: Interactuar con estaciones
-- **Shift**: Correr
 - **Q**: Soltar objeto que llevas en mano
 
 ## 🎯 Cómo Jugar
@@ -137,7 +136,7 @@ Puedes ajustar los siguientes valores en el editor:
 
 **En ChefPlayer:**
 - `speed`: Velocidad de movimiento normal
-- `sprint_speed`: Velocidad al correr
+- `click_stop_distance`: Distancia a la que el chef se detiene del punto clickeado
 
 **En CookingStation:**
 - `cook_time`: Tiempo para cocinar
@@ -169,7 +168,7 @@ Puedes ajustar los siguientes valores en el editor:
 ## 💡 Tips y Trucos
 
 1. **Organización es clave**: Planifica qué ingredientes necesitas antes de empezar
-2. **Usa el sprint**: Shift te permite moverte más rápido entre estaciones
+2. **Haz clicks precisos**: Marca puntos cerca de las estaciones para ahorrar tiempo
 3. **Atención a los temporizadores**: No dejes comida cocinando sin supervisión
 4. **Prioriza órdenes**: Completa primero las que están por vencer
 5. **Prepara con anticipación**: Puedes cortar ingredientes antes de que llegue la orden

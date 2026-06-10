@@ -24,7 +24,7 @@ var game_active: bool = true
 signal game_ended(final_score: int)
 
 
-const HINT_DEFAULT := "Acercate a una estacion | E: usar | Q: soltar | Basurero: descartar platos malos"
+const HINT_DEFAULT := "Click izquierdo: mover | E: usar | Q: soltar | Basurero: descartar platos malos"
 
 const ORDER_NAME_FONT := 15
 const ORDER_DETAIL_FONT := 15
