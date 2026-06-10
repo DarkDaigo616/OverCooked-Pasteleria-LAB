@@ -27,12 +27,8 @@ const LABELS := {
 	"lettuce": "LECHUGA",
 	"meat": "CARNE",
 	"bread": "PAN",
-	"chop": "CORTAR",
 	"cook": "Horno",
-	"plate": "PLATOS",
-	"plating": "EMPLATADO",
 	"delivery": "Entregar",
-	"trash": "BASURERO",
 }
 
 
@@ -41,18 +37,10 @@ static func build_station(data: Dictionary) -> StaticBody3D:
 	match stype:
 		"ingredient":
 			return _build_ingredient(data)
-		"chop":
-			return _build_chopping(data)
 		"cook":
 			return _build_cooking(data)
-		"plate":
-			return _build_plate(data)
-		"plating", "assembly":
-			return _build_plating(data)
 		"delivery":
 			return _build_delivery(data)
-		"trash":
-			return _build_trash(data)
 		_:
 			push_warning("StationFactory: tipo desconocido ", stype)
 			return StaticBody3D.new()
@@ -229,19 +217,6 @@ static func _build_ingredient(data: Dictionary) -> StaticBody3D:
 	return body
 
 
-static func _build_chopping(data: Dictionary) -> StaticBody3D:
-	var body := _base_station(
-		data.get("pos", Vector3.ZERO),
-		LABELS["chop"],
-		BASE + "cuttingboard.obj",
-		"chop"
-	)
-	body.set_script(load("res://scripts/chopping_station.gd"))
-	_add_item_holder(body)
-	_add_progress_bar(body)
-	return body
-
-
 static func _build_cooking(data: Dictionary) -> StaticBody3D:
 	var body := _base_station(
 		data.get("pos", Vector3.ZERO),
@@ -255,30 +230,6 @@ static func _build_cooking(data: Dictionary) -> StaticBody3D:
 	return body
 
 
-static func _build_plate(data: Dictionary) -> StaticBody3D:
-	var body := _base_station(
-		data.get("pos", Vector3.ZERO),
-		LABELS["plate"],
-		BASE + "dishrack_plates.obj",
-		"plate"
-	)
-	body.set_script(load("res://scripts/plate_station.gd"))
-	return body
-
-
-static func _build_plating(data: Dictionary) -> StaticBody3D:
-	var body := _base_station(
-		data.get("pos", Vector3.ZERO),
-		LABELS["plating"],
-		BASE + "kitchentable_A_large.obj",
-		"plating"
-	)
-	body.set_script(load("res://scripts/plating_station.gd"))
-	_add_item_holder(body)
-	_add_progress_bar(body)
-	return body
-
-
 static func _build_delivery(data: Dictionary) -> StaticBody3D:
 	var body := _base_station(
 		data.get("pos", Vector3.ZERO),
@@ -287,15 +238,4 @@ static func _build_delivery(data: Dictionary) -> StaticBody3D:
 		"delivery"
 	)
 	body.set_script(load("res://scripts/delivery_window.gd"))
-	return body
-
-
-static func _build_trash(data: Dictionary) -> StaticBody3D:
-	var body := _base_station(
-		data.get("pos", Vector3.ZERO),
-		LABELS["trash"],
-		BASE + "food_ingredient_burger_trash.obj",
-		"trash"
-	)
-	body.set_script(load("res://scripts/trash_station.gd"))
 	return body

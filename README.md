@@ -84,10 +84,7 @@ OvercookedGame/
 │   ├── chef_player.gd
 │   ├── station_base.gd
 │   ├── ingredient_station.gd
-│   ├── chopping_station.gd
 │   ├── cooking_station.gd
-│   ├── plate_station.gd
-│   ├── assembly_station.gd
 │   ├── delivery_window.gd
 │   ├── recipe.gd
 │   ├── order_manager.gd
@@ -96,8 +93,6 @@ OvercookedGame/
 ├── scenes/                # Escenas del juego
 │   ├── player/
 │   │   └── chef_player.tscn
-│   ├── stations/
-│   │   └── ingredient_station.tscn
 │   └── levels/
 │       └── kitchen_level.tscn
 └── assets/                # Carpeta para tus assets 3D
