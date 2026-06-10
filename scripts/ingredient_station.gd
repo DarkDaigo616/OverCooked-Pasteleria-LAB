@@ -9,7 +9,7 @@ class_name IngredientStation
 
 func _ready():
 	super._ready()
-	station_name = "Ingredient Station: " + ingredient_type.capitalize()
+	station_name = "Ingredientes: masa" if ingredient_type == "cake_batter" else "Ingredient Station: " + ingredient_type.capitalize()
 	can_hold_item = false
 
 
@@ -31,13 +31,15 @@ func create_ingredient() -> Node3D:
 	ingredient.set_meta("ingredient_type", ingredient_type)
 	ingredient.set_meta("state", "raw")
 	ingredient.set_meta("is_ingredient", true)
+	if ingredient_type == "cake_batter":
+		ingredient.set_meta("display_name", "Masa de pastel")
 
 	var static_body := StaticBody3D.new()
 	static_body.collision_layer = PhysicsLayers.ITEMS
 	static_body.collision_mask = PhysicsLayers.MASK_ITEM
 	var collision := CollisionShape3D.new()
 	var shape := SphereShape3D.new()
-	shape.radius = maxf(ingredient_size.x, ingredient_size.y) * 0.35
+	shape.radius = maxf(ingredient_size.x, ingredient_size.y) * 0.45
 	collision.shape = shape
 	static_body.add_child(collision)
 	ingredient.add_child(static_body)

@@ -11,7 +11,7 @@ const CHEF_MODEL_PATH := "res://assets/{models,textures,sounds}/KayKit_Restauran
 @export var floor_y: float = 1.0
 @export var chef_model_scale: float = 0.42
 @export var chef_model_y_offset: float = 0.0
-@export var model_yaw_offset_deg: float = 0.0
+@export var model_yaw_offset_deg: float = 180.0
 
 var held_item: Node3D = null
 var movement_enabled: bool = true
@@ -240,6 +240,15 @@ func _get_model_forward() -> Vector3:
 
 
 func attempt_interaction() -> void:
+	if not held_item:
+		var dropped := _get_nearest_dropped_item()
+		if dropped:
+			pickup_item(dropped)
+			var hud := _get_hud()
+			if hud:
+				hud.flash_interaction()
+			return
+
 	var target := _get_best_interactable()
 	if target and target.has_method("interact"):
 		target.interact(self)
@@ -253,7 +262,6 @@ func _get_best_interactable() -> Node3D:
 	var best: Node3D = null
 	var best_score := INF
 	var gp := global_position
-	var forward := _get_model_forward()
 
 	for node in _interactables_in_range:
 		if not is_instance_valid(node):
@@ -263,14 +271,25 @@ func _get_best_interactable() -> Node3D:
 		var dist := to_station.length()
 		if dist > interact_range:
 			continue
-		if dist > 0.05 and forward.length_squared() > 0.001:
-			var dot := forward.dot(to_station.normalized())
-			if dot < -0.25:
-				continue
 		var score := dist
 		if score < best_score:
 			best_score = score
 			best = node
+	return best
+
+
+func _get_nearest_dropped_item() -> Node3D:
+	var best: Node3D = null
+	var best_dist := interact_range
+	var gp := global_position
+	for node in get_tree().get_nodes_in_group("dropped_item"):
+		if not node is Node3D or not is_instance_valid(node):
+			continue
+		var item := node as Node3D
+		var dist := gp.distance_to(item.global_position)
+		if dist <= best_dist:
+			best_dist = dist
+			best = item
 	return best
 
 
@@ -279,6 +298,7 @@ func pickup_item(item: Node3D) -> bool:
 		return false
 
 	held_item = item
+	item.remove_from_group("dropped_item")
 	if item.get_parent():
 		item.get_parent().remove_child(item)
 	hand_position.add_child(item)
@@ -325,6 +345,7 @@ func drop_item() -> void:
 	drop_pos.x = clampf(drop_pos.x, -_level_bounds_half, _level_bounds_half)
 	drop_pos.z = clampf(drop_pos.z, -_level_bounds_half, _level_bounds_half)
 	item.global_position = drop_pos
+	item.add_to_group("dropped_item")
 	held_item = null
 	_set_item_physics_enabled(item, true)
 

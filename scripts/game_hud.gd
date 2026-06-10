@@ -24,22 +24,25 @@ var game_active: bool = true
 signal game_ended(final_score: int)
 
 
-const HINT_DEFAULT := "Click izquierdo: mover | E: usar | Q: soltar | Basurero: descartar platos malos"
+const HINT_DEFAULT := "Click izquierdo: mover | E: usar/interactuar | Q: soltar"
 
-const ORDER_NAME_FONT := 15
+const ORDER_NAME_FONT := 16
 const ORDER_DETAIL_FONT := 15
 const ORDER_TIME_FONT := 15
-const ORDER_PANEL_WIDTH := 300
-const ORDER_PANEL_HEIGHT := 420
-const ORDER_OUTLINE_SIZE := 6
+const ORDER_PANEL_WIDTH := 280
+const ORDER_PANEL_HEIGHT := 245
+const ORDER_OUTLINE_SIZE := 3
 
 const INGREDIENT_NAMES := {
+	"cake": "Pastel",
+	"cake_batter": "Masa",
 	"bread": "Pan",
 	"meat": "Carne",
 	"lettuce": "Lechuga",
 	"tomato": "Tomate",
 }
 const STATE_NAMES := {
+	"baked": "horneado",
 	"raw": "crudo",
 	"cooked": "cocido",
 	"chopped": "cortado",
@@ -53,12 +56,11 @@ var _max_order_slots: int = 4
 func _ready() -> void:
 	add_to_group("game_hud")
 	_resolve_orders_nodes()
+	_setup_top_labels()
 	_setup_orders_panel()
 	update_score(0)
 	if interaction_hint:
-		interaction_hint.visible = true
-		interaction_hint.text = HINT_DEFAULT
-		interaction_hint.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95))
+		_setup_hint_label()
 	if game_over_panel:
 		game_over_panel.visible = false
 	if menu_button:
@@ -77,14 +79,14 @@ func _resolve_orders_nodes() -> void:
 
 func _setup_orders_panel() -> void:
 	_order_panel_style = StyleBoxFlat.new()
-	_order_panel_style.bg_color = Color(0.05, 0.06, 0.1, 0.92)
-	_order_panel_style.border_color = Color(1, 0.9, 0.5, 0.7)
+	_order_panel_style.bg_color = Color(0.11, 0.09, 0.08, 0.88)
+	_order_panel_style.border_color = Color(0.95, 0.72, 0.32, 0.9)
 	_order_panel_style.set_border_width_all(2)
 	_order_panel_style.set_corner_radius_all(8)
-	_order_panel_style.content_margin_left = 8
-	_order_panel_style.content_margin_right = 8
-	_order_panel_style.content_margin_top = 6
-	_order_panel_style.content_margin_bottom = 6
+	_order_panel_style.content_margin_left = 10
+	_order_panel_style.content_margin_right = 10
+	_order_panel_style.content_margin_top = 8
+	_order_panel_style.content_margin_bottom = 8
 
 	if not orders_panel:
 		push_warning("GameHUD: OrdersPanel no encontrado")
@@ -96,7 +98,7 @@ func _setup_orders_panel() -> void:
 	_place_orders_panel_top_right()
 
 	if orders_title:
-		_style_order_label(orders_title, 17, Color(1, 0.98, 0.75))
+		_style_order_label(orders_title, 17, Color(1, 0.86, 0.42))
 
 	if orders_container:
 		orders_container.add_theme_constant_override("separation", 8)
@@ -104,6 +106,30 @@ func _setup_orders_panel() -> void:
 	if orders_scroll:
 		orders_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		orders_scroll.custom_minimum_size = Vector2(ORDER_PANEL_WIDTH - 20, ORDER_PANEL_HEIGHT - 48)
+
+
+func _setup_top_labels() -> void:
+	for label in [score_label, timer_label, level_label]:
+		if label == null:
+			continue
+		label.add_theme_color_override("font_color", Color(0.22, 0.13, 0.07))
+		label.add_theme_color_override("font_outline_color", Color(1.0, 0.94, 0.78, 0.95))
+		label.add_theme_constant_override("outline_size", 4)
+	if score_label:
+		score_label.add_theme_font_size_override("font_size", 28)
+	if timer_label:
+		timer_label.add_theme_font_size_override("font_size", 28)
+	if level_label:
+		level_label.add_theme_font_size_override("font_size", 18)
+
+
+func _setup_hint_label() -> void:
+	interaction_hint.visible = true
+	interaction_hint.text = HINT_DEFAULT
+	interaction_hint.add_theme_font_size_override("font_size", 22)
+	interaction_hint.add_theme_color_override("font_color", Color(0.22, 0.13, 0.07))
+	interaction_hint.add_theme_color_override("font_outline_color", Color(1.0, 0.94, 0.78, 1))
+	interaction_hint.add_theme_constant_override("outline_size", 4)
 
 
 func _place_orders_panel_top_right() -> void:
@@ -114,9 +140,9 @@ func _place_orders_panel_top_right() -> void:
 	move_child(orders_panel, -1)
 
 	orders_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	orders_panel.offset_left = -ORDER_PANEL_WIDTH - 12
-	orders_panel.offset_top = 68
-	orders_panel.offset_right = -8
+	orders_panel.offset_left = -ORDER_PANEL_WIDTH - 16
+	orders_panel.offset_top = 70
+	orders_panel.offset_right = -16
 	orders_panel.offset_bottom = 68 + ORDER_PANEL_HEIGHT
 	orders_panel.custom_minimum_size = Vector2(ORDER_PANEL_WIDTH, ORDER_PANEL_HEIGHT)
 
@@ -136,21 +162,21 @@ func _style_order_label(label: Label, font_size: int, color: Color) -> void:
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", color)
 	label.add_theme_constant_override("outline_size", ORDER_OUTLINE_SIZE)
-	label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
+	label.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03, 0.95))
 
 
 func show_station_target(station_name: String) -> void:
 	if not interaction_hint:
 		return
 	interaction_hint.text = "[ E ]  " + station_name
-	interaction_hint.add_theme_color_override("font_color", Color(1.0, 0.95, 0.35))
+	interaction_hint.add_theme_color_override("font_color", Color(0.24, 0.13, 0.05))
 
 
 func clear_station_target() -> void:
 	if not interaction_hint:
 		return
 	interaction_hint.text = HINT_DEFAULT
-	interaction_hint.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95))
+	interaction_hint.add_theme_color_override("font_color", Color(0.22, 0.13, 0.07))
 
 
 func show_delivery_feedback(message: String, success: bool) -> void:
@@ -158,7 +184,7 @@ func show_delivery_feedback(message: String, success: bool) -> void:
 		return
 	interaction_hint.text = message
 	if success:
-		interaction_hint.add_theme_color_override("font_color", Color(0.45, 1.0, 0.55))
+		interaction_hint.add_theme_color_override("font_color", Color(0.45, 1.0, 0.65))
 	else:
 		interaction_hint.add_theme_color_override("font_color", Color(1.0, 0.45, 0.4))
 	if _flash_tween and _flash_tween.is_valid():
@@ -252,7 +278,7 @@ func create_order_panel(order: Dictionary, order_number: int = 1) -> PanelContai
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.custom_minimum_size.x = ORDER_PANEL_WIDTH - 24
 	var card_style := _order_panel_style.duplicate() if _order_panel_style else StyleBoxFlat.new()
-	card_style.bg_color = Color(0.08, 0.1, 0.14, 0.95)
+	card_style.bg_color = Color(0.18, 0.13, 0.1, 0.94)
 	panel.add_theme_stylebox_override("panel", card_style)
 
 	var margin := MarginContainer.new()
@@ -271,19 +297,19 @@ func create_order_panel(order: Dictionary, order_number: int = 1) -> PanelContai
 
 	var index_label := Label.new()
 	index_label.text = "#%d" % order_number
-	_style_order_label(index_label, ORDER_NAME_FONT, Color(1, 0.92, 0.45))
+	_style_order_label(index_label, ORDER_NAME_FONT, Color(1, 0.78, 0.28))
 	header.add_child(index_label)
 
 	var name_label := Label.new()
 	name_label.text = order["recipe"].recipe_name
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_style_order_label(name_label, ORDER_NAME_FONT, Color(1, 1, 1))
+	_style_order_label(name_label, ORDER_NAME_FONT, Color(1.0, 0.96, 0.86))
 	header.add_child(name_label)
 
 	var time_label := Label.new()
 	time_label.text = format_time(order["time_remaining"])
-	_style_order_label(time_label, ORDER_TIME_FONT, Color(1.0, 0.82, 0.35))
+	_style_order_label(time_label, ORDER_TIME_FONT, Color(1.0, 0.72, 0.32))
 	header.add_child(time_label)
 
 	var ing_parts: PackedStringArray = []

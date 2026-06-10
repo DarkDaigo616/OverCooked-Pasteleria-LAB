@@ -1,26 +1,26 @@
 extends RefCounted
 class_name LevelLayouts
 
-## type: ingredient | chop | cook | plate | plating | delivery | trash
+## type: ingredient | cook | delivery
 
 static func get_level_count() -> int:
-	return 5
+	return 1
 
 
 static func get_layout(level_id: int) -> Dictionary:
-	match clampi(level_id, 1, 5):
-		1:
-			return _layout_classic()
-		2:
-			return _layout_mirror()
-		3:
-			return _layout_compact()
-		4:
-			return _layout_cross()
-		5:
-			return _layout_islands()
-		_:
-			return _layout_classic()
+	return _layout_cake_intro()
+
+
+static func _layout_cake_intro() -> Dictionary:
+	return {
+		"name": "Pasteleria basica",
+		"spawn": Vector3(0.0, 1.0, 5.0),
+		"stations": [
+			{"type": "ingredient", "ingredient": "cake_batter", "pos": Vector3(-8, 0.5, 0)},
+			{"type": "cook", "pos": Vector3(0, 0.5, -5)},
+			{"type": "delivery", "pos": Vector3(8, 0.5, 0)},
+		],
+	}
 
 
 static func _stations_common_ingredients(side_x: float, z_start: float, z_step: float) -> Array:

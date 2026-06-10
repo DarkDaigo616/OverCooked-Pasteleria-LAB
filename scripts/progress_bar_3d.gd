@@ -2,9 +2,9 @@ extends Node3D
 class_name ProgressBar3D
 
 @export var bar_width: float = 1.25
-@export var bar_depth: float = 0.1
-@export var bar_height: float = 0.14
-@export var y_offset: float = 1.35
+@export var bar_depth: float = 0.08
+@export var bar_height: float = 0.12
+@export var y_offset: float = 1.45
 
 var value: float = 0.0:
 	set(v):
@@ -22,6 +22,7 @@ var _fill: MeshInstance3D
 
 func _ready() -> void:
 	position.y = y_offset
+	position.z = 1.18
 	_build_meshes()
 	visible = false
 	_update_fill()
@@ -33,7 +34,7 @@ func _build_meshes() -> void:
 	_bg = MeshInstance3D.new()
 	_bg.mesh = bg_box
 	var bg_mat := StandardMaterial3D.new()
-	bg_mat.albedo_color = Color(0.15, 0.15, 0.18, 0.9)
+	bg_mat.albedo_color = Color(0.12, 0.08, 0.05, 0.88)
 	bg_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_bg.material_override = bg_mat
 	add_child(_bg)

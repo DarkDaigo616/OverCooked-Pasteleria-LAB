@@ -1,21 +1,19 @@
-[gd_scene load_steps=9 format=3 uid="uid://bey48kx5hteil"]
+[gd_scene load_steps=8 format=3 uid="uid://bey48kx5hteil"]
 
 [ext_resource type="Script" uid="uid://qk5e1dqspx3g" path="res://scripts/kitchen_level.gd" id="1_level"]
 [ext_resource type="PackedScene" uid="uid://c136c5qvhhql0" path="res://scenes/player/chef_player.tscn" id="2_player"]
 [ext_resource type="Script" uid="uid://g2nua1r3h0lp" path="res://scripts/game_manager.gd" id="3_gm"]
 [ext_resource type="Script" uid="uid://cbs7w0valhpf5" path="res://scripts/order_manager.gd" id="4_om"]
 [ext_resource type="Script" uid="uid://cfxyai0ju1kr7" path="res://scripts/game_hud.gd" id="5_hud"]
-[ext_resource type="ArrayMesh" uid="uid://c5b1nqoakmwks" path="res://assets/{models,textures,sounds}/KayKit_Restaurant_Bits_1.0_FREE/Assets/obj/floor_kitchen.obj" id="6_floor"]
-
 [sub_resource type="BoxShape3D" id="BoxShape3D_floor"]
 size = Vector3(36, 0.2, 36)
 
 [sub_resource type="Environment" id="Environment_main"]
 background_mode = 1
-background_color = Color(0.35, 0.37, 0.42, 1)
+background_color = Color(0.42, 0.35, 0.29, 1)
 ambient_light_source = 1
-ambient_light_color = Color(0.72, 0.75, 0.82, 1)
-ambient_light_energy = 1.35
+ambient_light_color = Color(0.92, 0.82, 0.68, 1)
+ambient_light_energy = 1.25
 tonemap_mode = 2
 tonemap_exposure = 1.1
 
@@ -27,6 +25,7 @@ script = ExtResource("3_gm")
 
 [node name="OrderManager" type="Node" parent="GameManager"]
 script = ExtResource("4_om")
+max_orders = 1
 order_spawn_interval = 35.0
 base_prep_time = 15.0
 
@@ -100,14 +99,14 @@ anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
 offset_left = -400.0
-offset_top = -110.0
+offset_top = -86.0
 offset_right = 400.0
-offset_bottom = -35.0
+offset_bottom = -30.0
 theme_override_colors/font_color = Color(0.9, 0.9, 0.95, 1)
 theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
-theme_override_constants/outline_size = 6
-theme_override_font_sizes/font_size = 28
-text = "Click izquierdo: mover | E: usar | Q: soltar"
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 22
+text = "Click izquierdo: mover | E: usar/interactuar | Q: soltar"
 horizontal_alignment = 1
 
 [node name="GameOverPanel" type="PanelContainer" parent="GameManager/GameHUD"]
@@ -156,7 +155,6 @@ shape = SubResource("BoxShape3D_floor")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Floor"]
 transform = Transform3D(9, 0, 0, 0, 1.5, 0, 0, 0, 9, 0, 0, 0)
-mesh = ExtResource("6_floor")
 
 [node name="Walls" type="Node3D" parent="."]
 

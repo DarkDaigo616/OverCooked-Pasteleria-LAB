@@ -8,7 +8,7 @@ var order_manager: OrderManager = null
 
 func _ready() -> void:
 	super._ready()
-	station_name = "Ventanilla de entrega"
+	station_name = "Entrega"
 	can_hold_item = false
 	_ensure_order_manager()
 
@@ -25,47 +25,39 @@ func interact(player: ChefPlayer) -> void:
 
 	var held := player.get_held_item()
 	if held == null:
-		_show_delivery_message("Lleva un plato con la comida terminada.", false)
+		_show_delivery_message("Lleva un pastel horneado.", false)
 		return
 
-	if not _is_plate(held):
-		_show_delivery_message("Solo puedes entregar un plato.", false)
+	if held.get_meta("ingredient_type", "") == "cake_batter":
+		_show_delivery_message("Todavia es masa. Primero usa el HORNO.", false)
 		return
 
-	var ingredients: Array = _get_plate_ingredients(held)
-	if ingredients.is_empty():
-		_show_delivery_message("El plato esta vacio. Usa la mesa de emplatado.", false)
+	if held.get_meta("ingredient_type", "") == "cake" and held.get_meta("state", "") == "burned":
+		_show_delivery_message("El pastel se quemo. Prepara otro.", false)
+		return
+
+	if not _is_baked_cake(held):
+		_show_delivery_message("Solo puedes entregar un pastel horneado.", false)
 		return
 
 	if order_manager == null:
 		_show_delivery_message("Error: no hay gestor de ordenes.", false)
 		return
 
-	var result: Dictionary = order_manager.check_delivery(ingredients)
+	var result := order_manager.check_delivery([
+		{"type": "cake", "state": "baked"}
+	])
 	if result.success:
 		player.destroy_held_item()
 		order_delivered.emit(true, result.points)
-		_show_delivery_message("¡Orden entregada! +%d puntos" % result.points, true)
+		_show_delivery_message("Pastel entregado! +%d puntos" % result.points, true)
 	else:
 		order_delivered.emit(false, 0)
-		var reason: String = result.get("reason", "Pedido incorrecto.")
-		_show_delivery_message(
-			"%s Usa el BASURERO para desechar el plato." % reason,
-			false
-		)
+		_show_delivery_message(result.get("reason", "Pedido incorrecto."), false)
 
 
-func _is_plate(node: Node3D) -> bool:
-	return node.has_meta("is_plate") and node.get_meta("is_plate") == true
-
-
-func _get_plate_ingredients(plate: Node3D) -> Array:
-	if not plate.has_meta("ingredients"):
-		return []
-	var raw: Variant = plate.get_meta("ingredients")
-	if raw is Array:
-		return Recipe.normalize_list(raw)
-	return []
+func _is_baked_cake(node: Node3D) -> bool:
+	return node.get_meta("ingredient_type", "") == "cake" and node.get_meta("state", "") == "baked"
 
 
 func _show_delivery_message(text: String, success: bool) -> void:

@@ -87,6 +87,7 @@ static func _tint_if_needed(mi: MeshInstance3D, ingredient_type: String, state: 
 static func _clear_generated_visual(root: Node3D) -> Node3D:
 	var old := root.get_node_or_null("GeneratedVisual")
 	if old:
+		root.remove_child(old)
 		old.queue_free()
 	var visual := Node3D.new()
 	visual.name = "GeneratedVisual"

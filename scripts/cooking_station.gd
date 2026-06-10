@@ -2,7 +2,7 @@ extends Station
 class_name CookingStation
 
 @export var cook_time: float = 5.0
-@export var burn_time: float = 3.0
+@export var burn_time: float = 999.0
 @export var auto_cook: bool = true
 
 var cooking_timer: float = 0.0
@@ -15,7 +15,7 @@ var _progress_bar: ProgressBar3D
 
 func _ready() -> void:
 	super._ready()
-	station_name = "Cooking Station"
+	station_name = "Horno"
 	max_items = 1
 	_progress_bar = $ProgressBar3D if has_node("ProgressBar3D") else null
 
@@ -31,16 +31,25 @@ func _process(delta: float) -> void:
 
 	if cooking_timer >= cook_time and not _item_cooked:
 		_item_cooked = true
-		item.set_meta("state", "cooked")
-		if item.has_meta("ingredient_type"):
-			ItemVisuals.apply_ingredient_visual(item, item.get_meta("ingredient_type"), "cooked", 0.35)
+		if item.get_meta("ingredient_type", "") == "cake_batter":
+			item.name = "cake"
+			item.set_meta("ingredient_type", "cake")
+			item.set_meta("state", "baked")
+			item.set_meta("is_cake", true)
+			item.set_meta("display_name", "Pastel horneado")
+			ItemVisuals.apply_ingredient_visual(item, "cake", "baked", 0.75)
+		else:
+			item.set_meta("state", "cooked")
+			if item.has_meta("ingredient_type"):
+				ItemVisuals.apply_ingredient_visual(item, item.get_meta("ingredient_type"), "cooked", 0.35)
 
 	if cooking_timer >= cook_time + burn_time and not is_burned:
 		item.set_meta("state", "burned")
 		is_burned = true
 		is_cooking = false
 		if item.has_meta("ingredient_type"):
-			ItemVisuals.apply_ingredient_visual(item, item.get_meta("ingredient_type"), "burned", 0.35)
+			var burn_scale := 0.75 if item.get_meta("ingredient_type", "") == "cake" else 0.35
+			ItemVisuals.apply_ingredient_visual(item, item.get_meta("ingredient_type"), "burned", burn_scale)
 		if _progress_bar:
 			_progress_bar.show_bar(false)
 		return
@@ -54,11 +63,9 @@ func _update_cook_bar() -> void:
 	_progress_bar.show_bar(true)
 	if cooking_timer < cook_time:
 		var ratio := cooking_timer / cook_time
-		_progress_bar.set_progress(ratio, Color(1.0, 0.55, 0.15))
+		_progress_bar.set_progress(ratio, Color(1.0, 0.62, 0.18))
 	else:
-		var burn_elapsed := cooking_timer - cook_time
-		var ratio := 1.0 - (burn_elapsed / burn_time)
-		_progress_bar.set_progress(ratio, Color(0.95, 0.2, 0.15))
+		_progress_bar.set_progress(1.0, Color(0.2, 0.95, 0.45))
 
 
 func interact(player: ChefPlayer) -> void:
@@ -83,6 +90,8 @@ func can_cook(item: Node3D) -> bool:
 	if not item.has_meta("is_ingredient"):
 		return false
 	var ing_type: String = item.get_meta("ingredient_type", "")
+	if ing_type == "cake_batter":
+		return item.get_meta("state", "") == "raw"
 	if ing_type == "bread" or ing_type == "lettuce":
 		return false
 	if not item.has_meta("state"):

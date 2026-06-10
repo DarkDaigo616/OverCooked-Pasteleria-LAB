@@ -6,7 +6,7 @@ signal order_failed(recipe: Recipe)
 signal new_order(recipe: Recipe)
 signal all_orders_updated(orders: Array)
 
-@export var max_orders: int = 4
+@export var max_orders: int = 1
 @export var order_spawn_interval: float = 20.0
 @export var base_prep_time: float = 0.0
 
@@ -43,49 +43,13 @@ func _process(delta: float) -> void:
 
 
 func create_recipes() -> void:
-	var burger := Recipe.new(
-		"Hamburguesa Simple",
-		[
-			{"type": "bread", "state": "raw"},
-			{"type": "meat", "state": "cooked"},
-			{"type": "lettuce", "state": "raw"},
-		],
-		150,
-		72.0
-	)
-	available_recipes.append(burger)
-
-	var salad := Recipe.new(
-		"Ensalada Fresca",
-		[
-			{"type": "lettuce", "state": "chopped"},
-			{"type": "tomato", "state": "chopped"},
-		],
+	var cake := Recipe.new(
+		"Pastel horneado",
+		[{"type": "cake", "state": "baked"}],
 		100,
-		52.0
+		60.0
 	)
-	available_recipes.append(salad)
-
-	var cooked_tomato := Recipe.new(
-		"Tomate Asado",
-		[{"type": "tomato", "state": "cooked"}],
-		80,
-		38.0
-	)
-	available_recipes.append(cooked_tomato)
-
-	var deluxe_burger := Recipe.new(
-		"Hamburguesa Deluxe",
-		[
-			{"type": "bread", "state": "raw"},
-			{"type": "meat", "state": "cooked"},
-			{"type": "lettuce", "state": "chopped"},
-			{"type": "tomato", "state": "chopped"},
-		],
-		250,
-		105.0
-	)
-	available_recipes.append(deluxe_burger)
+	available_recipes.append(cake)
 
 
 func spawn_new_order() -> void:

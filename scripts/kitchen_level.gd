@@ -16,9 +16,9 @@ const FLOOR_SIZE := 36.0
 const WALL_INSET := 0.6
 const FLOOR_TILE_SIZE := 4.0
 # Azul pizarra medio — contrasta con el chef blanco (evita tonos claros/blancos)
-const FLOOR_COLOR_A := Color(0.34, 0.39, 0.48)
-const FLOOR_COLOR_B := Color(0.26, 0.31, 0.4)
-const FLOOR_BORDER_COLOR := Color(0.14, 0.16, 0.22)
+const FLOOR_COLOR_A := Color(0.62, 0.48, 0.34)
+const FLOOR_COLOR_B := Color(0.74, 0.62, 0.46)
+const FLOOR_BORDER_COLOR := Color(0.36, 0.22, 0.13)
 
 const DECO_MESHES: Array[String] = [
 	"fridge_A.obj",
@@ -85,17 +85,17 @@ func _setup_lighting() -> void:
 		env_node.environment = Environment.new()
 	var env: Environment = env_node.environment
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.72, 0.75, 0.82)
-	env.ambient_light_energy = 1.35
+	env.ambient_light_color = Color(0.92, 0.82, 0.68)
+	env.ambient_light_energy = 1.25
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.35, 0.37, 0.42)
+	env.background_color = Color(0.42, 0.35, 0.29)
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
 	env.tonemap_exposure = 1.2
 
 	var sun := $DirectionalLight3D
 	if sun:
-		sun.light_energy = 1.45
-		sun.light_color = Color(1.0, 0.97, 0.9)
+		sun.light_energy = 1.35
+		sun.light_color = Color(1.0, 0.86, 0.66)
 		sun.shadow_enabled = true
 
 	if not has_node("FillLights"):
