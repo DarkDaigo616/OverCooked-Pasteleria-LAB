@@ -4,60 +4,66 @@ extends Node3D
 @onready var walls_root: Node3D = $Walls
 @onready var decor_root: Node3D = $Decorations
 @onready var chef: ChefPlayer = $ChefPlayer
-@onready var level_label: Label = $GameManager/GameHUD/MarginContainer/VBoxContainer/LevelLabel
+@onready var level_label: Label = $GameManager/GameHUD/MarginContainer/VBoxContainer/LevelBanner/LevelLabel
 @onready var floor_mesh: MeshInstance3D = $Floor/MeshInstance3D
 @onready var floor_shape: CollisionShape3D = $Floor/CollisionShape3D
 @onready var floor_root: StaticBody3D = $Floor
 @onready var camera: Camera3D = $Camera3D
 
+var _navigation_obstacles: Array[Rect2] = []
+
 const WALL_HEIGHT := 3.5
 const PLAY_HALF := 16.5
 const FLOOR_SIZE := 36.0
 const WALL_INSET := 0.6
-const FLOOR_TILE_SIZE := 4.0
+const FLOOR_TILE_SIZE := 2.0
+const FLOOR_TILE_ASSET := "floor_kitchen_small.gltf"
+const FLOOR_TILE_ASSET_SCALE := 1.0
+const FLOOR_TILE_VISUAL_Y := -0.48
 # Azul pizarra medio — contrasta con el chef blanco (evita tonos claros/blancos)
 const FLOOR_COLOR_A := Color(0.62, 0.48, 0.34)
 const FLOOR_COLOR_B := Color(0.74, 0.62, 0.46)
 const FLOOR_BORDER_COLOR := Color(0.36, 0.22, 0.13)
 
-const ASSET_BASE := "res://assets/{models,textures,sounds}/KayKit_Restaurant_Bits_1.0_FREE/Assets/obj/"
+const ASSET_BASE := "res://assets/{models,textures,sounds}/KayKit_Restaurant_Bits_1.0_FREE/Assets/gltf/"
 const DECORATION_SPECS := [
-	{"asset": "fridge_A_decorated.obj", "pos": Vector3(-14.2, 0, -11.8), "scale": 0.9, "rot": 90.0},
-	{"asset": "fridge_A.obj", "pos": Vector3(-14.2, 0, -8.6), "scale": 0.9, "rot": 90.0},
-	{"asset": "kitchencounter_straight_A_decorated.obj", "pos": Vector3(-9.8, 0, -14.2), "scale": 0.9, "rot": 0.0},
-	{"asset": "kitchencounter_sink_backsplash.obj", "pos": Vector3(-6.7, 0, -14.2), "scale": 0.9, "rot": 0.0},
-	{"asset": "stove_multi_decorated.obj", "pos": Vector3(-2.8, 0, -14.1), "scale": 0.92, "rot": 0.0},
-	{"asset": "extractorhood.obj", "pos": Vector3(-2.8, 1.15, -14.4), "scale": 0.9, "rot": 0.0},
-	{"asset": "shelf_papertowel_decorated.obj", "pos": Vector3(2.2, 0, -14.3), "scale": 0.9, "rot": 0.0},
-	{"asset": "kitchencabinet.obj", "pos": Vector3(5.4, 0, -14.2), "scale": 0.9, "rot": 0.0},
-	{"asset": "wall_orderwindow_decorated.obj", "pos": Vector3(10.3, 0, -14.3), "scale": 0.95, "rot": 0.0},
-	{"asset": "menu.obj", "pos": Vector3(13.9, 0.1, -10.4), "scale": 0.85, "rot": -90.0},
-	{"asset": "kitchentable_A_large_decorated.obj", "pos": Vector3(-6.2, 0, 7.8), "scale": 0.82, "rot": 90.0},
-	{"asset": "cuttingboard.obj", "pos": Vector3(-6.2, 1.08, 7.8), "scale": 0.85, "rot": 20.0},
-	{"asset": "knife.obj", "pos": Vector3(-5.7, 1.16, 7.65), "scale": 0.8, "rot": -20.0},
-	{"asset": "dishrack_plates.obj", "pos": Vector3(-11.6, 0, 8.8), "scale": 0.88, "rot": 90.0},
-	{"asset": "pot_A_stew.obj", "pos": Vector3(-0.2, 1.08, -5.0), "scale": 0.75, "rot": 0.0},
-	{"asset": "pan_A.obj", "pos": Vector3(0.55, 1.1, -5.1), "scale": 0.75, "rot": 35.0},
-	{"asset": "crate_buns.obj", "pos": Vector3(-9.7, 0, 2.2), "scale": 0.8, "rot": 18.0},
-	{"asset": "crate_tomatoes.obj", "pos": Vector3(-11.6, 0, 1.0), "scale": 0.8, "rot": -12.0},
-	{"asset": "table_round_A_decorated.obj", "pos": Vector3(12.2, 0, 8.0), "scale": 0.9, "rot": 0.0},
-	{"asset": "chair_A.obj", "pos": Vector3(12.2, 0, 5.9), "scale": 0.88, "rot": 180.0},
-	{"asset": "chair_B.obj", "pos": Vector3(14.2, 0, 8.0), "scale": 0.88, "rot": -90.0},
-	{"asset": "chair_A.obj", "pos": Vector3(10.2, 0, 8.0), "scale": 0.88, "rot": 90.0},
-	{"asset": "table_round_B.obj", "pos": Vector3(12.7, 0, 12.7), "scale": 0.82, "rot": 25.0},
-	{"asset": "chair_stool.obj", "pos": Vector3(10.9, 0, 12.7), "scale": 0.82, "rot": 90.0},
-	{"asset": "chair_stool.obj", "pos": Vector3(14.5, 0, 12.7), "scale": 0.82, "rot": -90.0},
-	{"asset": "pillar_A.obj", "pos": Vector3(-15.2, 0, 14.2), "scale": 0.95, "rot": 0.0},
-	{"asset": "pillar_B.obj", "pos": Vector3(15.2, 0, 14.2), "scale": 0.95, "rot": 0.0},
+	{"asset": "fridge_A_decorated.gltf", "pos": Vector3(-14.2, 0, -11.8), "scale": 0.9, "rot": 90.0},
+	{"asset": "fridge_A.gltf", "pos": Vector3(-14.2, 0, -8.6), "scale": 0.9, "rot": 90.0},
+	{"asset": "kitchencounter_straight_A_decorated.gltf", "pos": Vector3(-9.8, 0, -14.2), "scale": 0.9, "rot": 0.0},
+	{"asset": "kitchencounter_sink_backsplash.gltf", "pos": Vector3(-6.7, 0, -14.2), "scale": 0.9, "rot": 0.0},
+	{"asset": "stove_multi_decorated.gltf", "pos": Vector3(-2.8, 0, -14.1), "scale": 0.92, "rot": 0.0},
+	{"asset": "extractorhood.gltf", "pos": Vector3(-2.8, 1.15, -14.4), "scale": 0.9, "rot": 0.0},
+	{"asset": "shelf_papertowel_decorated.gltf", "pos": Vector3(2.2, 0, -14.3), "scale": 0.9, "rot": 0.0},
+	{"asset": "kitchencabinet.gltf", "pos": Vector3(5.4, 0, -14.2), "scale": 0.9, "rot": 0.0},
+	{"asset": "wall_orderwindow_decorated.gltf", "pos": Vector3(10.3, 0, -14.3), "scale": 0.95, "rot": 0.0},
+	{"asset": "menu.gltf", "pos": Vector3(13.9, 0.1, -10.4), "scale": 0.85, "rot": -90.0},
+	{"asset": "kitchentable_A_large_decorated.gltf", "pos": Vector3(-6.2, 0, 7.8), "scale": 0.82, "rot": 90.0},
+	{"asset": "cuttingboard.gltf", "pos": Vector3(-6.2, 1.08, 7.8), "scale": 0.85, "rot": 20.0},
+	{"asset": "knife.gltf", "pos": Vector3(-5.7, 1.16, 7.65), "scale": 0.8, "rot": -20.0},
+	{"asset": "dishrack_plates.gltf", "pos": Vector3(-11.6, 0, 8.8), "scale": 0.88, "rot": 90.0},
+	{"asset": "pot_A_stew.gltf", "pos": Vector3(-0.2, 1.08, -5.0), "scale": 0.75, "rot": 0.0},
+	{"asset": "pan_A.gltf", "pos": Vector3(0.55, 1.1, -5.1), "scale": 0.75, "rot": 35.0},
+	{"asset": "crate_buns.gltf", "pos": Vector3(-9.7, 0, 2.2), "scale": 0.8, "rot": 18.0},
+	{"asset": "crate_tomatoes.gltf", "pos": Vector3(-11.6, 0, 1.0), "scale": 0.8, "rot": -12.0},
+	{"asset": "table_round_A_decorated.gltf", "pos": Vector3(12.2, 0, 8.0), "scale": 0.9, "rot": 0.0},
+	{"asset": "chair_A.gltf", "pos": Vector3(12.2, 0, 5.9), "scale": 0.88, "rot": 180.0},
+	{"asset": "chair_B.gltf", "pos": Vector3(14.2, 0, 8.0), "scale": 0.88, "rot": -90.0},
+	{"asset": "chair_A.gltf", "pos": Vector3(10.2, 0, 8.0), "scale": 0.88, "rot": 90.0},
+	{"asset": "table_round_B.gltf", "pos": Vector3(12.7, 0, 12.7), "scale": 0.82, "rot": 25.0},
+	{"asset": "chair_stool.gltf", "pos": Vector3(10.9, 0, 12.7), "scale": 0.82, "rot": 90.0},
+	{"asset": "chair_stool.gltf", "pos": Vector3(14.5, 0, 12.7), "scale": 0.82, "rot": -90.0},
+	{"asset": "pillar_A.gltf", "pos": Vector3(-15.2, 0, 14.2), "scale": 0.95, "rot": 0.0},
+	{"asset": "pillar_B.gltf", "pos": Vector3(15.2, 0, 14.2), "scale": 0.95, "rot": 0.0},
 ]
 
 
 func _ready() -> void:
 	var level_id := GameState.selected_level
 	var layout := LevelLayouts.get_layout(level_id)
+	_navigation_obstacles.clear()
 	_setup_floor()
 	_setup_lighting()
-	_build_stations(layout.get("stations", []))
+	await _build_stations(layout.get("stations", []))
 	_build_boundary_walls()
 	_build_extra_walls(layout.get("walls", []))
 	_build_decorations(level_id)
@@ -66,6 +72,7 @@ func _ready() -> void:
 	_place_player(spawn)
 	if chef:
 		chef.configure_level_bounds(PLAY_HALF, spawn)
+		chef.configure_navigation_obstacles(_navigation_obstacles)
 	if level_label:
 		level_label.text = "Nivel %d: %s" % [level_id, layout.get("name", "")]
 	if camera:
@@ -82,6 +89,7 @@ func _setup_floor() -> void:
 		floor_mesh.mesh = base
 		floor_mesh.transform = Transform3D.IDENTITY
 		floor_mesh.position.y = -0.02
+		floor_mesh.visible = false
 		var base_mat := StandardMaterial3D.new()
 		base_mat.albedo_color = FLOOR_COLOR_A
 		base_mat.roughness = 0.92
@@ -101,17 +109,17 @@ func _setup_lighting() -> void:
 		env_node.environment = Environment.new()
 	var env: Environment = env_node.environment
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.92, 0.82, 0.68)
-	env.ambient_light_energy = 1.25
+	env.ambient_light_color = Color(0.82, 0.76, 0.68)
+	env.ambient_light_energy = 0.58
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.42, 0.35, 0.29)
+	env.background_color = Color(0.32, 0.29, 0.25)
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env.tonemap_exposure = 1.2
+	env.tonemap_exposure = 0.78
 
 	var sun := $DirectionalLight3D
 	if sun:
-		sun.light_energy = 1.35
-		sun.light_color = Color(1.0, 0.86, 0.66)
+		sun.light_energy = 0.72
+		sun.light_color = Color(1.0, 0.91, 0.78)
 		sun.shadow_enabled = true
 
 	if not has_node("FillLights"):
@@ -126,8 +134,8 @@ func _setup_lighting() -> void:
 		for p in positions:
 			var omni := OmniLight3D.new()
 			omni.position = p
-			omni.light_energy = 1.8
-			omni.light_color = Color(1.0, 0.95, 0.88)
+			omni.light_energy = 0.55
+			omni.light_color = Color(1.0, 0.92, 0.82)
 			omni.omni_range = 22.0
 			omni.shadow_enabled = false
 			fills.add_child(omni)
@@ -140,6 +148,7 @@ func _build_stations(station_data: Array) -> void:
 	for data in station_data:
 		var station := StationFactory.build_station(data)
 		stations_root.add_child(station)
+		_register_navigation_obstacle(station.position, Vector2(2.25, 2.15), 0.0)
 
 
 func _build_decorations(level_id: int) -> void:
@@ -156,29 +165,35 @@ func _build_decorations(level_id: int) -> void:
 
 	match level_id:
 		1:
-			_spawn_deco_asset("plate.obj", Vector3(8.2, 1.15, 0.3), 0.7, 12.0)
-			_spawn_deco_asset("stew_bowl.obj", Vector3(7.7, 1.18, -0.25), 0.68, -18.0)
+			_spawn_deco_asset("plate.gltf", Vector3(8.2, 1.15, 0.3), 0.7, 12.0)
+			_spawn_deco_asset("stew_bowl.gltf", Vector3(7.7, 1.18, -0.25), 0.68, -18.0)
 		2:
-			_spawn_deco_asset("menu.obj", Vector3(15, 0, 14), 0.9, -90.0)
+			_spawn_deco_asset("menu.gltf", Vector3(15, 0, 14), 0.9, -90.0)
 		3:
-			_spawn_deco_asset("extractorhood.obj", Vector3(0, 0, -15), 0.85, 0.0)
+			_spawn_deco_asset("extractorhood.gltf", Vector3(0, 0, -15), 0.85, 0.0)
 		4:
-			_spawn_deco_asset("pillar_A.obj", Vector3(-15, 0, 0), 1.0, 0.0)
-			_spawn_deco_asset("pillar_B.obj", Vector3(15, 0, 0), 1.0, 0.0)
+			_spawn_deco_asset("pillar_A.gltf", Vector3(-15, 0, 0), 1.0, 0.0)
+			_spawn_deco_asset("pillar_B.gltf", Vector3(15, 0, 0), 1.0, 0.0)
 		5:
-			_spawn_deco_asset("fridge_A.obj", Vector3(-15.5, 0, 8), 0.9, 90.0)
-			_spawn_deco_asset("fridge_A.obj", Vector3(15.5, 0, 8), 0.9, -90.0)
+			_spawn_deco_asset("fridge_A.gltf", Vector3(-15.5, 0, 8), 0.9, 90.0)
+			_spawn_deco_asset("fridge_A.gltf", Vector3(15.5, 0, 8), 0.9, -90.0)
 
 
 func _spawn_deco_asset(asset_name: String, pos: Vector3, scale_mul: float, rotation_y_degrees: float) -> void:
 	if asset_name.is_empty():
 		return
-	_spawn_deco(ASSET_BASE + asset_name, pos, scale_mul, rotation_y_degrees)
-
-
-func _spawn_deco(asset_path: String, pos: Vector3, scale_mul: float, rotation_y_degrees: float) -> void:
-	if not ResourceLoader.exists(asset_path):
+	if not _spawn_deco(ASSET_BASE + asset_name, pos, scale_mul, rotation_y_degrees):
 		return
+
+	var collider_size := _get_deco_collider_size(asset_name) * scale_mul
+	if collider_size.x > 0.0 and collider_size.y > 0.0:
+		_add_deco_collision(asset_name, pos, collider_size, rotation_y_degrees)
+		_register_navigation_obstacle(pos, collider_size, rotation_y_degrees)
+
+
+func _spawn_deco(asset_path: String, pos: Vector3, scale_mul: float, rotation_y_degrees: float) -> bool:
+	if not ResourceLoader.exists(asset_path):
+		return false
 	var res := load(asset_path)
 	var node: Node3D = null
 	if res is PackedScene:
@@ -188,11 +203,72 @@ func _spawn_deco(asset_path: String, pos: Vector3, scale_mul: float, rotation_y_
 		mi.mesh = res as Mesh
 		node = mi
 	if node == null:
-		return
+		return false
 	node.position = pos
 	node.scale = Vector3.ONE * scale_mul
 	node.rotation_degrees.y = rotation_y_degrees
 	decor_root.add_child(node)
+	return true
+
+
+func _get_deco_collider_size(asset_name: String) -> Vector2:
+	if asset_name.contains("cuttingboard") or asset_name.contains("knife"):
+		return Vector2.ZERO
+	if asset_name.contains("pot") or asset_name.contains("pan") or asset_name.contains("plate") or asset_name.contains("bowl"):
+		return Vector2.ZERO
+	if asset_name.contains("extractorhood") or asset_name.contains("menu"):
+		return Vector2.ZERO
+	if asset_name.contains("fridge"):
+		return Vector2(1.45, 1.45)
+	if asset_name.contains("kitchencounter") or asset_name.contains("kitchencabinet"):
+		return Vector2(2.15, 1.35)
+	if asset_name.contains("stove"):
+		return Vector2(2.1, 1.45)
+	if asset_name.contains("shelf"):
+		return Vector2(1.85, 0.95)
+	if asset_name.contains("wall_orderwindow"):
+		return Vector2(2.0, 0.9)
+	if asset_name.contains("kitchentable_A_large"):
+		return Vector2(3.45, 1.8)
+	if asset_name.contains("table_round"):
+		return Vector2(2.15, 2.15)
+	if asset_name.contains("chair"):
+		return Vector2(0.9, 0.9)
+	if asset_name.contains("dishrack"):
+		return Vector2(1.2, 0.95)
+	if asset_name.contains("crate"):
+		return Vector2(1.05, 1.05)
+	if asset_name.contains("pillar"):
+		return Vector2(0.95, 0.95)
+	return Vector2.ZERO
+
+
+func _add_deco_collision(asset_name: String, pos: Vector3, footprint: Vector2, rotation_y_degrees: float) -> void:
+	var body := StaticBody3D.new()
+	body.name = "Collision_%s" % asset_name.get_basename()
+	body.position = Vector3(pos.x, 0.75, pos.z)
+	body.rotation_degrees.y = rotation_y_degrees
+	body.collision_layer = PhysicsLayers.WORLD
+	body.collision_mask = 0
+
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(footprint.x, 1.5, footprint.y)
+	var col := CollisionShape3D.new()
+	col.shape = shape
+	body.add_child(col)
+	decor_root.add_child(body)
+
+
+func _register_navigation_obstacle(pos: Vector3, footprint: Vector2, rotation_y_degrees: float) -> void:
+	var final_size := footprint
+	var y_rot := fposmod(absf(rotation_y_degrees), 180.0)
+	if y_rot > 45.0 and y_rot < 135.0:
+		final_size = Vector2(footprint.y, footprint.x)
+	var rect := Rect2(
+		Vector2(pos.x - final_size.x * 0.5, pos.z - final_size.y * 0.5),
+		final_size
+	)
+	_navigation_obstacles.append(rect)
 
 
 func _build_boundary_walls() -> void:
@@ -240,7 +316,12 @@ func _build_floor_checker() -> void:
 	pattern.name = "FloorPattern"
 	floor_root.add_child(pattern)
 
-	var half := PLAY_HALF - 1.0
+	var tile_scene: PackedScene = null
+	var tile_path := ASSET_BASE + FLOOR_TILE_ASSET
+	if ResourceLoader.exists(tile_path):
+		tile_scene = load(tile_path) as PackedScene
+
+	var half := PLAY_HALF - WALL_INSET - 0.9
 	var tile := FLOOR_TILE_SIZE
 	var row := 0
 	var z := -half
@@ -248,20 +329,35 @@ func _build_floor_checker() -> void:
 		var col := 0
 		var x := -half
 		while x < half - 0.01:
-			var tile_mesh := MeshInstance3D.new()
-			var box := BoxMesh.new()
-			box.size = Vector3(tile - 0.08, 0.03, tile - 0.08)
-			tile_mesh.mesh = box
-			var mat := StandardMaterial3D.new()
-			mat.albedo_color = FLOOR_COLOR_B if (row + col) % 2 == 0 else FLOOR_COLOR_A
-			mat.roughness = 0.88
-			tile_mesh.material_override = mat
-			tile_mesh.position = Vector3(x + tile * 0.5, 0.015, z + tile * 0.5)
-			pattern.add_child(tile_mesh)
+			var tile_pos := Vector3(x + tile * 0.5, FLOOR_TILE_VISUAL_Y, z + tile * 0.5)
+			if tile_scene:
+				var tile_node := tile_scene.instantiate() as Node3D
+				if tile_node:
+					tile_node.position = tile_pos
+					tile_node.scale = Vector3.ONE * FLOOR_TILE_ASSET_SCALE
+					tile_node.rotation_degrees.y = 90.0 if (row + col) % 2 == 0 else 0.0
+					pattern.add_child(tile_node)
+				else:
+					_add_fallback_floor_tile(pattern, tile_pos, row, col)
+			else:
+				_add_fallback_floor_tile(pattern, tile_pos, row, col)
 			x += tile
 			col += 1
 		z += tile
 		row += 1
+
+
+func _add_fallback_floor_tile(parent: Node3D, pos: Vector3, row: int, col: int) -> void:
+	var tile_mesh := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(FLOOR_TILE_SIZE - 0.08, 0.03, FLOOR_TILE_SIZE - 0.08)
+	tile_mesh.mesh = box
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = FLOOR_COLOR_B if (row + col) % 2 == 0 else FLOOR_COLOR_A
+	mat.roughness = 0.88
+	tile_mesh.material_override = mat
+	tile_mesh.position = pos
+	parent.add_child(tile_mesh)
 
 
 func _build_floor_border() -> void:

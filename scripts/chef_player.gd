@@ -12,6 +12,8 @@ const CHEF_MODEL_PATH := "res://assets/{models,textures,sounds}/KayKit_Restauran
 @export var chef_model_scale: float = 0.42
 @export var chef_model_y_offset: float = 0.0
 @export var model_yaw_offset_deg: float = 180.0
+@export var navigation_grid_size: float = 1.0
+@export var navigation_clearance: float = 0.65
 
 var held_item: Node3D = null
 var movement_enabled: bool = true
@@ -21,6 +23,9 @@ var _spawn_position: Vector3 = Vector3.ZERO
 var _last_target: Node3D = null
 var _move_target: Vector3 = Vector3.ZERO
 var _has_move_target: bool = false
+var _path_points: Array[Vector3] = []
+var _path_index: int = 0
+var _navigation_obstacles: Array[Rect2] = []
 
 @onready var model = $Model
 @onready var hand_position: Node3D = $Model/HandPosition
@@ -92,8 +97,14 @@ func configure_level_bounds(half_size: float, spawn: Vector3) -> void:
 	global_position = spawn
 	_move_target = spawn
 	_has_move_target = false
+	_path_points.clear()
+	_path_index = 0
 	if _spawn_position.y < floor_y:
 		_spawn_position.y = floor_y
+
+
+func configure_navigation_obstacles(obstacles: Array[Rect2]) -> void:
+	_navigation_obstacles = obstacles.duplicate()
 
 
 func _physics_process(delta: float) -> void:
@@ -143,7 +154,21 @@ func _set_click_move_target(screen_position: Vector2) -> void:
 	target.y = floor_y
 	target.x = clampf(target.x, -_level_bounds_half, _level_bounds_half)
 	target.z = clampf(target.z, -_level_bounds_half, _level_bounds_half)
+	_set_navigation_target(target)
+
+
+func _set_navigation_target(target: Vector3) -> void:
 	_move_target = target
+	_path_points.clear()
+	_path_index = 0
+
+	if _navigation_obstacles.is_empty() or not _segment_hits_obstacle(global_position, target):
+		_path_points.append(target)
+	else:
+		_path_points = _build_grid_path(global_position, target)
+		if _path_points.is_empty():
+			_path_points.append(target)
+
 	_has_move_target = true
 
 
@@ -202,7 +227,8 @@ func handle_movement(delta: float) -> void:
 		velocity.z = move_toward(velocity.z, 0, friction * delta)
 		return
 
-	var to_target := _move_target - global_position
+	var current_target := _get_current_path_target()
+	var to_target := current_target - global_position
 	to_target.y = 0.0
 	var distance := to_target.length()
 
@@ -211,14 +237,195 @@ func handle_movement(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, direction.x * speed, acceleration * delta)
 		velocity.z = move_toward(velocity.z, direction.z * speed, acceleration * delta)
 	else:
-		_has_move_target = false
-		velocity.x = move_toward(velocity.x, 0, friction * delta)
-		velocity.z = move_toward(velocity.z, 0, friction * delta)
+		if _advance_path_point():
+			handle_movement(delta)
+			return
+		else:
+			_has_move_target = false
+			velocity.x = move_toward(velocity.x, 0, friction * delta)
+			velocity.z = move_toward(velocity.z, 0, friction * delta)
 
 	if global_position.y > floor_y + 0.05:
 		velocity.y -= 20.0 * delta
 	else:
 		velocity.y = 0.0
+
+
+func _get_current_path_target() -> Vector3:
+	if _path_points.is_empty():
+		return _move_target
+	return _path_points[clampi(_path_index, 0, _path_points.size() - 1)]
+
+
+func _advance_path_point() -> bool:
+	if _path_points.is_empty():
+		return false
+	if _path_index < _path_points.size() - 1:
+		_path_index += 1
+		return true
+	return false
+
+
+func _segment_hits_obstacle(from: Vector3, to: Vector3) -> bool:
+	var a := Vector2(from.x, from.z)
+	var b := Vector2(to.x, to.z)
+	for rect in _navigation_obstacles:
+		var grown := rect.grow(navigation_clearance)
+		if grown.has_point(a) or grown.has_point(b):
+			return true
+		if _segment_intersects_rect(a, b, grown):
+			return true
+	return false
+
+
+func _segment_intersects_rect(a: Vector2, b: Vector2, rect: Rect2) -> bool:
+	var p := rect.position
+	var s := rect.size
+	var p1 := p
+	var p2 := p + Vector2(s.x, 0)
+	var p3 := p + s
+	var p4 := p + Vector2(0, s.y)
+	return (
+		Geometry2D.segment_intersects_segment(a, b, p1, p2) != null
+		or Geometry2D.segment_intersects_segment(a, b, p2, p3) != null
+		or Geometry2D.segment_intersects_segment(a, b, p3, p4) != null
+		or Geometry2D.segment_intersects_segment(a, b, p4, p1) != null
+	)
+
+
+func _build_grid_path(from: Vector3, to: Vector3) -> Array[Vector3]:
+	var start := _cell_for_point(Vector2(from.x, from.z))
+	var goal := _find_nearest_free_cell(_cell_for_point(Vector2(to.x, to.z)))
+	if _is_cell_blocked(start):
+		start = _find_nearest_free_cell(start)
+
+	var open: Array[Vector2i] = [start]
+	var came_from := {}
+	var g_score := {start: 0.0}
+	var f_score := {start: _cell_distance(start, goal)}
+	var closed := {}
+
+	while not open.is_empty():
+		var current := _pop_lowest_score_cell(open, f_score)
+		if current == goal:
+			return _cells_to_path(_reconstruct_cells(came_from, current), to)
+
+		closed[current] = true
+		for neighbor in _get_cell_neighbors(current):
+			if closed.has(neighbor) or _is_cell_blocked(neighbor):
+				continue
+			var move_cost := _cell_distance(current, neighbor)
+			var tentative_g: float = g_score.get(current, INF) + move_cost
+			if tentative_g >= g_score.get(neighbor, INF):
+				continue
+			came_from[neighbor] = current
+			g_score[neighbor] = tentative_g
+			f_score[neighbor] = tentative_g + _cell_distance(neighbor, goal)
+			if not open.has(neighbor):
+				open.append(neighbor)
+
+	return []
+
+
+func _cell_for_point(point: Vector2) -> Vector2i:
+	return Vector2i(
+		roundi(point.x / navigation_grid_size),
+		roundi(point.y / navigation_grid_size)
+	)
+
+
+func _point_for_cell(cell: Vector2i) -> Vector2:
+	return Vector2(cell.x * navigation_grid_size, cell.y * navigation_grid_size)
+
+
+func _is_cell_blocked(cell: Vector2i) -> bool:
+	var p := _point_for_cell(cell)
+	if absf(p.x) > _level_bounds_half or absf(p.y) > _level_bounds_half:
+		return true
+	for rect in _navigation_obstacles:
+		if rect.grow(navigation_clearance).has_point(p):
+			return true
+	return false
+
+
+func _find_nearest_free_cell(origin: Vector2i) -> Vector2i:
+	if not _is_cell_blocked(origin):
+		return origin
+	for radius in range(1, 8):
+		for x in range(origin.x - radius, origin.x + radius + 1):
+			for y in range(origin.y - radius, origin.y + radius + 1):
+				if abs(x - origin.x) != radius and abs(y - origin.y) != radius:
+					continue
+				var cell := Vector2i(x, y)
+				if not _is_cell_blocked(cell):
+					return cell
+	return origin
+
+
+func _get_cell_neighbors(cell: Vector2i) -> Array[Vector2i]:
+	var neighbors: Array[Vector2i] = []
+	for x in range(-1, 2):
+		for y in range(-1, 2):
+			if x == 0 and y == 0:
+				continue
+			var next := cell + Vector2i(x, y)
+			if x != 0 and y != 0:
+				if _is_cell_blocked(cell + Vector2i(x, 0)) or _is_cell_blocked(cell + Vector2i(0, y)):
+					continue
+			neighbors.append(next)
+	return neighbors
+
+
+func _pop_lowest_score_cell(open: Array[Vector2i], f_score: Dictionary) -> Vector2i:
+	var best_index := 0
+	var best_score: float = f_score.get(open[0], INF)
+	for i in range(1, open.size()):
+		var score: float = f_score.get(open[i], INF)
+		if score < best_score:
+			best_score = score
+			best_index = i
+	var cell := open[best_index]
+	open.remove_at(best_index)
+	return cell
+
+
+func _cell_distance(a: Vector2i, b: Vector2i) -> float:
+	return Vector2(a).distance_to(Vector2(b))
+
+
+func _reconstruct_cells(came_from: Dictionary, current: Vector2i) -> Array[Vector2i]:
+	var path: Array[Vector2i] = [current]
+	while came_from.has(current):
+		current = came_from[current]
+		path.push_front(current)
+	return path
+
+
+func _cells_to_path(cells: Array[Vector2i], final_target: Vector3) -> Array[Vector3]:
+	var path: Array[Vector3] = []
+	for i in range(1, cells.size()):
+		var p := _point_for_cell(cells[i])
+		path.append(Vector3(p.x, floor_y, p.y))
+	path.append(final_target)
+	return _simplify_path(path)
+
+
+func _simplify_path(path: Array[Vector3]) -> Array[Vector3]:
+	if path.size() <= 2:
+		return path
+	var simplified: Array[Vector3] = []
+	var anchor := global_position
+	var i := 0
+	while i < path.size():
+		var furthest := i
+		for j in range(path.size() - 1, i - 1, -1):
+			if not _segment_hits_obstacle(anchor, path[j]):
+				furthest = j
+				break
+		simplified.append(path[furthest])
+		anchor = path[furthest]
+		i = furthest + 1
+	return simplified
 
 
 func handle_rotation(delta: float) -> void:

@@ -3,7 +3,8 @@ class_name GameHUD
 
 @onready var score_label = $MarginContainer/VBoxContainer/TopBar/ScoreLabel
 @onready var timer_label = $MarginContainer/VBoxContainer/TopBar/TimerLabel
-@onready var level_label = $MarginContainer/VBoxContainer/LevelLabel
+@onready var level_banner: PanelContainer = $MarginContainer/VBoxContainer/LevelBanner
+@onready var level_label = $MarginContainer/VBoxContainer/LevelBanner/LevelLabel
 @onready var orders_panel: PanelContainer = $MarginContainer/VBoxContainer/OrdersPanel
 @onready var orders_container: VBoxContainer = (
 	$MarginContainer/VBoxContainer/OrdersPanel/VBoxContainer/OrdersScroll/OrdersList
@@ -121,6 +122,20 @@ func _setup_top_labels() -> void:
 		timer_label.add_theme_font_size_override("font_size", 28)
 	if level_label:
 		level_label.add_theme_font_size_override("font_size", 18)
+		level_label.add_theme_color_override("font_color", Color(1.0, 0.91, 0.68))
+		level_label.add_theme_color_override("font_outline_color", Color(0.06, 0.035, 0.02, 1.0))
+		level_label.add_theme_constant_override("outline_size", 3)
+	if level_banner:
+		var banner_style := StyleBoxFlat.new()
+		banner_style.bg_color = Color(0.13, 0.09, 0.06, 0.86)
+		banner_style.border_color = Color(0.95, 0.68, 0.28, 0.95)
+		banner_style.set_border_width_all(2)
+		banner_style.set_corner_radius_all(8)
+		banner_style.content_margin_left = 18
+		banner_style.content_margin_right = 18
+		banner_style.content_margin_top = 6
+		banner_style.content_margin_bottom = 6
+		level_banner.add_theme_stylebox_override("panel", banner_style)
 
 
 func _setup_hint_label() -> void:

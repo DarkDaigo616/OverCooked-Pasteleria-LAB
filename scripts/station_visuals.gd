@@ -33,7 +33,7 @@ static func _add_platform(body: StaticBody3D, accent: Color) -> void:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = accent.darkened(0.28)
 	mat.emission_enabled = true
-	mat.emission = accent * 0.18
+	mat.emission = accent * 0.08
 	mat.roughness = 0.68
 	pad.material_override = mat
 	body.add_child(pad)
@@ -52,7 +52,7 @@ static func _add_highlight_ring(body: StaticBody3D, accent: Color) -> void:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = accent
 	mat.emission_enabled = true
-	mat.emission = accent * 0.9
+	mat.emission = accent * 0.45
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.albedo_color.a = 0.48
 	ring.material_override = mat
@@ -65,8 +65,8 @@ static func _add_station_light(body: StaticBody3D, accent: Color) -> void:
 	light.name = "StationLight"
 	light.position = Vector3(0, 2.4, 0)
 	light.light_color = accent.lerp(Color.WHITE, 0.5)
-	light.light_energy = 1.05
-	light.omni_range = 4.5
+	light.light_energy = 0.35
+	light.omni_range = 3.4
 	light.shadow_enabled = false
 	body.add_child(light)
 

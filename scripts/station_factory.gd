@@ -1,16 +1,16 @@
 extends RefCounted
 class_name StationFactory
 
-const BASE := "res://assets/{models,textures,sounds}/KayKit_Restaurant_Bits_1.0_FREE/Assets/obj/"
+const BASE := "res://assets/{models,textures,sounds}/KayKit_Restaurant_Bits_1.0_FREE/Assets/gltf/"
 const COUNTER_SHAPE_SIZE := Vector3(1.95, 1.38, 1.88)
 const MESH_SCALE := 1.2
 
 const INGREDIENT_MESHES := {
-	"cake_batter": BASE + "bowl.obj",
-	"tomato": BASE + "crate_tomatoes.obj",
-	"lettuce": BASE + "crate_lettuce.obj",
-	"meat": BASE + "crate_steak.obj",
-	"bread": BASE + "crate_buns.obj",
+	"cake_batter": BASE + "bowl.gltf",
+	"tomato": BASE + "crate_tomatoes.gltf",
+	"lettuce": BASE + "crate_lettuce.gltf",
+	"meat": BASE + "crate_steak.gltf",
+	"bread": BASE + "crate_buns.gltf",
 }
 
 const INGREDIENT_COLORS := {
@@ -206,7 +206,11 @@ static func _add_item_holder(parent: StaticBody3D) -> Node3D:
 static func _add_progress_bar(parent: Node3D) -> ProgressBar3D:
 	var bar := ProgressBar3D.new()
 	bar.name = "ProgressBar3D"
-	bar.y_offset = 1.45
+	bar.y_offset = 2.55
+	bar.z_offset = 1.35
+	bar.bar_width = 2.05
+	bar.bar_height = 0.24
+	bar.bar_depth = 0.18
 	parent.add_child(bar)
 	return bar
 
@@ -232,7 +236,7 @@ static func _build_cooking(data: Dictionary) -> StaticBody3D:
 	var body := _base_station(
 		data.get("pos", Vector3.ZERO),
 		LABELS["cook"],
-		BASE + "stove_multi.obj",
+		BASE + "oven.gltf",
 		"cook"
 	)
 	body.set_script(load("res://scripts/cooking_station.gd"))
@@ -245,7 +249,7 @@ static func _build_delivery(data: Dictionary) -> StaticBody3D:
 	var body := _base_station(
 		data.get("pos", Vector3.ZERO),
 		LABELS["delivery"],
-		BASE + "wall_orderwindow_decorated.obj",
+		BASE + "wall_orderwindow_decorated.gltf",
 		"delivery"
 	)
 	body.set_script(load("res://scripts/delivery_window.gd"))

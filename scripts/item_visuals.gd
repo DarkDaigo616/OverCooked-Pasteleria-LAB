@@ -1,7 +1,7 @@
 extends RefCounted
 class_name ItemVisuals
 
-const BASE := "res://assets/{models,textures,sounds}/KayKit_Restaurant_Bits_1.0_FREE/Assets/obj/"
+const BASE := "res://assets/{models,textures,sounds}/KayKit_Restaurant_Bits_1.0_FREE/Assets/gltf/"
 
 static func ingredient_mesh_path(ingredient_type: String, state: String) -> String:
 	match ingredient_type:
@@ -9,24 +9,24 @@ static func ingredient_mesh_path(ingredient_type: String, state: String) -> Stri
 			return ""
 		"tomato":
 			if state == "chopped":
-				return BASE + "food_ingredient_tomato_slices.obj"
-			return BASE + "food_ingredient_tomato.obj"
+				return BASE + "food_ingredient_tomato_slices.gltf"
+			return BASE + "food_ingredient_tomato.gltf"
 		"lettuce":
 			if state == "chopped":
-				return BASE + "food_ingredient_lettuce_chopped.obj"
-			return BASE + "food_ingredient_lettuce.obj"
+				return BASE + "food_ingredient_lettuce_chopped.gltf"
+			return BASE + "food_ingredient_lettuce.gltf"
 		"meat":
 			match state:
 				"cooked":
-					return BASE + "food_ingredient_burger_cooked.obj"
+					return BASE + "food_ingredient_burger_cooked.gltf"
 				"burned":
-					return BASE + "food_ingredient_burger_trash.obj"
+					return BASE + "food_ingredient_burger_trash.gltf"
 				_:
-					return BASE + "food_ingredient_steak.obj"
+					return BASE + "food_ingredient_steak.gltf"
 		"bread":
-			return BASE + "food_ingredient_bun.obj"
+			return BASE + "food_ingredient_bun.gltf"
 		_:
-			return BASE + "food_ingredient_carrot.obj"
+			return BASE + "food_ingredient_carrot.gltf"
 
 
 static func load_ingredient_mesh(ingredient_type: String, state: String) -> Mesh:
@@ -46,7 +46,7 @@ static func load_ingredient_scene(ingredient_type: String, state: String) -> Pac
 
 
 static func plate_mesh_path() -> String:
-	return BASE + "plate_small.obj"
+	return BASE + "plate_small.gltf"
 
 
 static func set_mesh_on_first_mesh_instance(root: Node3D, mesh: Mesh, scale_mul: float = 1.0) -> MeshInstance3D:
