@@ -1,7 +1,7 @@
 extends RefCounted
 class_name ItemVisuals
 
-const BASE := "res://assets/{models,textures,sounds}/KayKit_Restaurant_Bits_1.0_FREE/Assets/obj/"
+const BASE := "res://assets/{models,textures,sounds}/KayKit_Restaurant_Bits_1.0_FREE/Assets/gltf/"
 
 static func ingredient_mesh_path(ingredient_type: String, state: String) -> String:
 	match ingredient_type:
@@ -9,24 +9,24 @@ static func ingredient_mesh_path(ingredient_type: String, state: String) -> Stri
 			return ""
 		"tomato":
 			if state == "chopped":
-				return BASE + "food_ingredient_tomato_slices.obj"
-			return BASE + "food_ingredient_tomato.obj"
+				return BASE + "food_ingredient_tomato_slices.gltf"
+			return BASE + "food_ingredient_tomato.gltf"
 		"lettuce":
 			if state == "chopped":
-				return BASE + "food_ingredient_lettuce_chopped.obj"
-			return BASE + "food_ingredient_lettuce.obj"
+				return BASE + "food_ingredient_lettuce_chopped.gltf"
+			return BASE + "food_ingredient_lettuce.gltf"
 		"meat":
 			match state:
 				"cooked":
-					return BASE + "food_ingredient_burger_cooked.obj"
+					return BASE + "food_ingredient_burger_cooked.gltf"
 				"burned":
-					return BASE + "food_ingredient_burger_trash.obj"
+					return BASE + "food_ingredient_burger_trash.gltf"
 				_:
-					return BASE + "food_ingredient_steak.obj"
+					return BASE + "food_ingredient_steak.gltf"
 		"bread":
-			return BASE + "food_ingredient_bun.obj"
+			return BASE + "food_ingredient_bun.gltf"
 		_:
-			return BASE + "food_ingredient_carrot.obj"
+			return BASE + "food_ingredient_carrot.gltf"
 
 
 static func load_ingredient_mesh(ingredient_type: String, state: String) -> Mesh:
@@ -37,8 +37,16 @@ static func load_ingredient_mesh(ingredient_type: String, state: String) -> Mesh
 	return res as Mesh
 
 
+static func load_ingredient_scene(ingredient_type: String, state: String) -> PackedScene:
+	var path := ingredient_mesh_path(ingredient_type, state)
+	if path.is_empty() or not ResourceLoader.exists(path):
+		return null
+	var res = load(path)
+	return res as PackedScene
+
+
 static func plate_mesh_path() -> String:
-	return BASE + "plate_small.obj"
+	return BASE + "plate_small.gltf"
 
 
 static func set_mesh_on_first_mesh_instance(root: Node3D, mesh: Mesh, scale_mul: float = 1.0) -> MeshInstance3D:
@@ -74,7 +82,11 @@ static func apply_ingredient_visual(root: Node3D, ingredient_type: String, state
 		var mi := set_mesh_on_first_mesh_instance(root, mesh, mesh_scale)
 		_tint_if_needed(mi, ingredient_type, state)
 	else:
-		_apply_fallback_ingredient_visual(root, ingredient_type, state, mesh_scale)
+		var scene := load_ingredient_scene(ingredient_type, state)
+		if scene:
+			_apply_scene_visual(root, scene, mesh_scale)
+		else:
+			_apply_fallback_ingredient_visual(root, ingredient_type, state, mesh_scale)
 
 
 static func _tint_if_needed(mi: MeshInstance3D, ingredient_type: String, state: String) -> void:
@@ -82,6 +94,15 @@ static func _tint_if_needed(mi: MeshInstance3D, ingredient_type: String, state: 
 		var mat := StandardMaterial3D.new()
 		mat.albedo_color = Color(0.85, 0.35, 0.15)
 		mi.material_override = mat
+
+
+static func _apply_scene_visual(root: Node3D, scene: PackedScene, mesh_scale: float) -> void:
+	var visual := _clear_generated_visual(root)
+	var node := scene.instantiate() as Node3D
+	if node == null:
+		return
+	node.scale = Vector3.ONE * mesh_scale
+	visual.add_child(node)
 
 
 static func _clear_generated_visual(root: Node3D) -> Node3D:

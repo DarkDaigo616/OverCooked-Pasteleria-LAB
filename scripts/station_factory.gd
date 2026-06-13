@@ -1,16 +1,19 @@
 extends RefCounted
 class_name StationFactory
 
-const BASE := "res://assets/{models,textures,sounds}/KayKit_Restaurant_Bits_1.0_FREE/Assets/obj/"
+const Materials = preload("res://materials/bakery_materials.gd")
+const TINY_TREATS_BASE := "res://assets/{models,textures,sounds}/Tiny_Treats_Bakery_Interior_1.1_FREE/Assets/gltf/"
+const KAYKIT_BASE := "res://assets/{models,textures,sounds}/KayKit_Restaurant_Bits_1.0_FREE/Assets/gltf/"
 const COUNTER_SHAPE_SIZE := Vector3(1.95, 1.38, 1.88)
-const MESH_SCALE := 1.2
+const MESH_SCALE := 1.75
+const OVEN_MESH_SCALE := 1.2
 
 const INGREDIENT_MESHES := {
-	"cake_batter": BASE + "bowl.obj",
-	"tomato": BASE + "crate_tomatoes.obj",
-	"lettuce": BASE + "crate_lettuce.obj",
-	"meat": BASE + "crate_steak.obj",
-	"bread": BASE + "crate_buns.obj",
+	"cake_batter": TINY_TREATS_BASE + "mixing_bowl.gltf",
+	"tomato": TINY_TREATS_BASE + "basket_A.gltf",
+	"lettuce": TINY_TREATS_BASE + "basket_B.gltf",
+	"meat": TINY_TREATS_BASE + "countertop_straight_A_short.gltf",
+	"bread": TINY_TREATS_BASE + "bread.gltf",
 }
 
 const INGREDIENT_COLORS := {
@@ -50,10 +53,12 @@ static func _base_station(
 	pos: Vector3,
 	label_text: String,
 	mesh_path: String,
-	station_type: String
+	station_type: String,
+	mesh_scale: float = MESH_SCALE
 ) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.position = pos
+	body.set_meta("station_type", station_type)
 	body.collision_layer = PhysicsLayers.STATIONS
 	body.collision_mask = 0
 
@@ -63,21 +68,11 @@ static func _base_station(
 	col.shape = shape
 	body.add_child(col)
 
-	if ResourceLoader.exists(mesh_path):
-		var mesh: Mesh = load(mesh_path)
-		if mesh:
-			var mi := MeshInstance3D.new()
-			mi.name = "StationMesh"
-			mi.mesh = mesh
-			mi.scale = Vector3.ONE * MESH_SCALE
-			mi.position.y = 0.08
-			body.add_child(mi)
-	else:
+	if not _add_asset_child(body, mesh_path, "StationMesh", Vector3.ONE * mesh_scale, Vector3(0, 0.08, 0)):
 		_add_fallback_counter(body, station_type)
 
-	var label := Label3D.new()
-	label.text = label_text
-	body.add_child(label)
+	body.set_meta("display_name", label_text)
+	_add_station_dressing(body, station_type)
 
 	StationVisuals.apply_to_station(body, label_text, station_type)
 	return body
@@ -89,17 +84,17 @@ static func _add_fallback_counter(body: StaticBody3D, station_type: String) -> v
 	var accent := Color(0.86, 0.72, 0.42)
 	match station_type:
 		"ingredient":
-			base_color = Color(0.42, 0.52, 0.38)
-			top_color = Color(0.82, 0.74, 0.56)
-			accent = Color(0.95, 0.73, 0.28)
+			base_color = Materials.WOOD
+			top_color = Materials.CREAM
+			accent = Materials.PASTEL_YELLOW
 		"cook":
-			base_color = Color(0.34, 0.31, 0.32)
-			top_color = Color(0.18, 0.18, 0.2)
+			base_color = Materials.CHOCOLATE
+			top_color = Color(0.45, 0.22, 0.14)
 			accent = Color(0.95, 0.32, 0.16)
 		"delivery":
-			base_color = Color(0.42, 0.39, 0.48)
-			top_color = Color(0.64, 0.72, 0.68)
-			accent = Color(0.35, 0.85, 0.65)
+			base_color = Color(0.48, 0.32, 0.22)
+			top_color = Materials.CREAM_LIGHT
+			accent = Materials.PASTEL_GREEN
 
 	_add_box(body, "StationMesh", Vector3(1.9, 0.9, 1.45), Vector3(0, 0.5, 0), base_color)
 	_add_box(body, "StationTop", Vector3(2.05, 0.18, 1.6), Vector3(0, 1.04, 0), top_color)
@@ -114,14 +109,28 @@ static func _add_fallback_counter(body: StaticBody3D, station_type: String) -> v
 			_add_delivery_props(body, accent)
 
 
+static func _add_asset_child(parent: Node3D, path: String, node_name: String, scale: Vector3, pos: Vector3) -> bool:
+	if not ResourceLoader.exists(path):
+		return false
+	var res := load(path)
+	var node: Node3D = null
+	if res is PackedScene:
+		node = (res as PackedScene).instantiate() as Node3D
+	elif res is Mesh:
+		var mi := MeshInstance3D.new()
+		mi.mesh = res as Mesh
+		node = mi
+	if node == null:
+		return false
+	node.name = node_name
+	node.scale = scale
+	node.position = pos
+	parent.add_child(node)
+	return true
+
+
 static func _make_mat(color: Color, emission: float = 0.0) -> StandardMaterial3D:
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
-	mat.roughness = 0.78
-	if emission > 0.0:
-		mat.emission_enabled = true
-		mat.emission = color * emission
-	return mat
+	return Materials.make(color, 0.78, emission)
 
 
 static func _add_box(parent: Node3D, name: String, size: Vector3, pos: Vector3, color: Color, emission: float = 0.0) -> MeshInstance3D:
@@ -184,6 +193,22 @@ static func _add_delivery_props(body: Node3D, accent: Color) -> void:
 	_add_box(body, "Ticket", Vector3(0.42, 0.48, 0.04), Vector3(0.54, 1.55, -0.35), Color(1.0, 0.94, 0.72))
 
 
+static func _add_station_dressing(body: Node3D, station_type: String) -> void:
+	match station_type:
+		"ingredient":
+			_add_box(body, "WarmCounterInsert", Vector3(1.5, 0.07, 1.08), Vector3(0, 1.14, 0), Materials.WOOD)
+			_add_sphere(body, "FlourPile", 0.18, Vector3(-0.42, 1.28, -0.2), Materials.FLOUR, Vector3(1.35, 0.38, 1.0))
+			_add_cylinder(body, "SmallCreamBowl", 0.18, 0.12, Vector3(0.38, 1.3, 0.18), Materials.CREAM_LIGHT)
+		"cook":
+			_add_box(body, "WarmOvenGlow", Vector3(0.9, 0.08, 0.06), Vector3(0, 0.82, -0.86), Color(1.0, 0.48, 0.16), 0.5)
+			_add_cylinder(body, "OvenReadyPlate", 0.28, 0.05, Vector3(0.0, 1.42, 0.05), Materials.CREAM_LIGHT)
+		"delivery":
+			_add_box(body, "DeliveryCounterWood", Vector3(1.65, 0.08, 0.72), Vector3(0, 1.2, 0), Materials.WOOD)
+			_add_cylinder(body, "DisplayCakeA", 0.16, 0.11, Vector3(-0.38, 1.34, -0.08), Materials.PASTEL_PINK)
+			_add_cylinder(body, "DisplayCakeB", 0.16, 0.11, Vector3(0.0, 1.34, -0.08), Materials.PASTEL_YELLOW)
+			_add_cylinder(body, "DisplayCakeC", 0.16, 0.11, Vector3(0.38, 1.34, -0.08), Materials.PASTEL_GREEN)
+
+
 static func _add_item_holder(parent: StaticBody3D) -> Node3D:
 	var holder := Node3D.new()
 	holder.name = "ItemHolder"
@@ -195,7 +220,11 @@ static func _add_item_holder(parent: StaticBody3D) -> Node3D:
 static func _add_progress_bar(parent: Node3D) -> ProgressBar3D:
 	var bar := ProgressBar3D.new()
 	bar.name = "ProgressBar3D"
-	bar.y_offset = 1.45
+	bar.y_offset = 3.05
+	bar.z_offset = 1.65
+	bar.bar_width = 2.35
+	bar.bar_height = 0.24
+	bar.bar_depth = 0.18
 	parent.add_child(bar)
 	return bar
 
@@ -221,8 +250,9 @@ static func _build_cooking(data: Dictionary) -> StaticBody3D:
 	var body := _base_station(
 		data.get("pos", Vector3.ZERO),
 		LABELS["cook"],
-		BASE + "stove_multi.obj",
-		"cook"
+		KAYKIT_BASE + "oven.gltf",
+		"cook",
+		OVEN_MESH_SCALE
 	)
 	body.set_script(load("res://scripts/cooking_station.gd"))
 	_add_item_holder(body)
@@ -234,7 +264,7 @@ static func _build_delivery(data: Dictionary) -> StaticBody3D:
 	var body := _base_station(
 		data.get("pos", Vector3.ZERO),
 		LABELS["delivery"],
-		BASE + "wall_orderwindow.obj",
+		TINY_TREATS_BASE + "display_case_long.gltf",
 		"delivery"
 	)
 	body.set_script(load("res://scripts/delivery_window.gd"))

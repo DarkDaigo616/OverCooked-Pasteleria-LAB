@@ -4,6 +4,7 @@ class_name CookingStation
 @export var cook_time: float = 5.0
 @export var burn_time: float = 999.0
 @export var auto_cook: bool = true
+@export_range(0.0, 1.0, 0.05) var progress_loss_on_remove: float = 0.2
 
 var cooking_timer: float = 0.0
 var is_cooking: bool = false
@@ -11,6 +12,8 @@ var is_burned: bool = false
 var _item_cooked: bool = false
 
 var _progress_bar: ProgressBar3D
+
+const COOKING_PROGRESS_META := "cooking_progress"
 
 
 func _ready() -> void:
@@ -28,6 +31,7 @@ func _process(delta: float) -> void:
 
 	cooking_timer += delta
 	var item: Node3D = current_items[0]
+	item.set_meta(COOKING_PROGRESS_META, cooking_timer)
 
 	if cooking_timer >= cook_time and not _item_cooked:
 		_item_cooked = true
@@ -37,14 +41,17 @@ func _process(delta: float) -> void:
 			item.set_meta("state", "baked")
 			item.set_meta("is_cake", true)
 			item.set_meta("display_name", "Pastel horneado")
+			item.set_meta(COOKING_PROGRESS_META, cook_time)
 			ItemVisuals.apply_ingredient_visual(item, "cake", "baked", 0.75)
 		else:
 			item.set_meta("state", "cooked")
+			item.set_meta(COOKING_PROGRESS_META, cook_time)
 			if item.has_meta("ingredient_type"):
 				ItemVisuals.apply_ingredient_visual(item, item.get_meta("ingredient_type"), "cooked", 0.35)
 
 	if cooking_timer >= cook_time + burn_time and not is_burned:
 		item.set_meta("state", "burned")
+		item.set_meta(COOKING_PROGRESS_META, cook_time + burn_time)
 		is_burned = true
 		is_cooking = false
 		if item.has_meta("ingredient_type"):
@@ -65,7 +72,7 @@ func _update_cook_bar() -> void:
 		var ratio := cooking_timer / cook_time
 		_progress_bar.set_progress(ratio, Color(1.0, 0.62, 0.18))
 	else:
-		_progress_bar.set_progress(1.0, Color(0.2, 0.95, 0.45))
+		_progress_bar.show_complete_check(true)
 
 
 func interact(player: ChefPlayer) -> void:
@@ -82,6 +89,7 @@ func interact(player: ChefPlayer) -> void:
 	if not current_items.is_empty() and not player.has_item():
 		var item := take_item()
 		if item:
+			_store_interrupted_progress(item)
 			player.pickup_item(item)
 			reset_cooking()
 
@@ -102,12 +110,12 @@ func can_cook(item: Node3D) -> bool:
 
 func start_cooking() -> void:
 	is_cooking = true
-	cooking_timer = 0.0
-	is_burned = false
-	_item_cooked = false
+	var item := current_items[0] if not current_items.is_empty() else null
+	cooking_timer = _get_saved_progress(item)
+	is_burned = item != null and item.get_meta("state", "") == "burned"
+	_item_cooked = cooking_timer >= cook_time or (item != null and item.get_meta("state", "") in ["baked", "cooked"])
 	if _progress_bar:
-		_progress_bar.show_bar(true)
-		_progress_bar.set_progress(0.0, Color(1.0, 0.55, 0.15))
+		_update_cook_bar()
 
 
 func reset_cooking() -> void:
@@ -124,3 +132,19 @@ func place_item(item: Node3D) -> bool:
 	if result and auto_cook:
 		start_cooking()
 	return result
+
+
+func _get_saved_progress(item: Node3D) -> float:
+	if item == null:
+		return 0.0
+	return clampf(float(item.get_meta(COOKING_PROGRESS_META, 0.0)), 0.0, cook_time + burn_time)
+
+
+func _store_interrupted_progress(item: Node3D) -> void:
+	if item == null:
+		return
+	if cooking_timer >= cook_time:
+		item.set_meta(COOKING_PROGRESS_META, cooking_timer)
+		return
+	var saved_progress := cooking_timer * (1.0 - progress_loss_on_remove)
+	item.set_meta(COOKING_PROGRESS_META, saved_progress)

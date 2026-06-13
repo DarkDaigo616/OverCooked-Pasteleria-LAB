@@ -1,10 +1,11 @@
 extends Node3D
 class_name ProgressBar3D
 
-@export var bar_width: float = 1.25
-@export var bar_depth: float = 0.08
-@export var bar_height: float = 0.12
-@export var y_offset: float = 1.45
+@export var bar_width: float = 2.0
+@export var bar_depth: float = 0.16
+@export var bar_height: float = 0.22
+@export var y_offset: float = 2.55
+@export var z_offset: float = 1.35
 
 var value: float = 0.0:
 	set(v):
@@ -17,36 +18,65 @@ var fill_color: Color = Color(0.25, 0.85, 0.35):
 		_apply_fill_color()
 
 var _bg: MeshInstance3D
+var _frame: MeshInstance3D
 var _fill: MeshInstance3D
+var _check: Sprite3D
 
 
 func _ready() -> void:
 	position.y = y_offset
-	position.z = 1.18
+	position.z = z_offset
 	_build_meshes()
+	_build_check()
 	visible = false
 	_update_fill()
 
 
 func _build_meshes() -> void:
+	var frame_box := BoxMesh.new()
+	frame_box.size = Vector3(bar_width + 0.18, bar_height + 0.14, bar_depth + 0.08)
+	_frame = MeshInstance3D.new()
+	_frame.mesh = frame_box
+	_frame.position = Vector3(0, 0, -0.02)
+	var frame_mat := StandardMaterial3D.new()
+	frame_mat.albedo_color = Color(0.04, 0.025, 0.015, 0.96)
+	frame_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_frame.material_override = frame_mat
+	add_child(_frame)
+
 	var bg_box := BoxMesh.new()
 	bg_box.size = Vector3(bar_width, bar_height, bar_depth)
 	_bg = MeshInstance3D.new()
 	_bg.mesh = bg_box
+	_bg.position = Vector3(0, 0, 0.02)
 	var bg_mat := StandardMaterial3D.new()
-	bg_mat.albedo_color = Color(0.12, 0.08, 0.05, 0.88)
+	bg_mat.albedo_color = Color(0.12, 0.08, 0.05, 0.94)
 	bg_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_bg.material_override = bg_mat
 	add_child(_bg)
 
 	var fill_box := BoxMesh.new()
-	fill_box.size = Vector3(bar_width, bar_height, bar_depth * 0.9)
+	fill_box.size = Vector3(bar_width, bar_height * 0.78, bar_depth * 0.82)
 	_fill = MeshInstance3D.new()
 	_fill.mesh = fill_box
-	_fill.position = Vector3(-bar_width * 0.5, 0, bar_depth * 0.05)
+	_fill.position = Vector3(-bar_width * 0.5, 0, bar_depth * 0.24)
 	_apply_fill_color()
 	add_child(_fill)
 	_update_fill()
+
+
+func _build_check() -> void:
+	_check = Sprite3D.new()
+	_check.name = "CompleteCheck"
+	_check.texture = UITheme.texture("PNG/Green/Double/check_square_grey_checkmark.png")
+	_check.pixel_size = 0.011
+	_check.scale = Vector3(1.55, 1.55, 1.0)
+	_check.modulate = Color.WHITE
+	_check.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_check.no_depth_test = true
+	_check.render_priority = 8
+	_check.visible = false
+	add_child(_check)
 
 
 func _apply_fill_color() -> void:
@@ -55,7 +85,7 @@ func _apply_fill_color() -> void:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = fill_color
 	mat.emission_enabled = true
-	mat.emission = fill_color * 0.35
+	mat.emission = fill_color * 0.65
 	_fill.material_override = mat
 
 
@@ -69,11 +99,34 @@ func _update_fill() -> void:
 
 func show_bar(show: bool) -> void:
 	visible = show
+	if _check:
+		_check.visible = false
+	if _frame:
+		_frame.visible = show
+	if _bg:
+		_bg.visible = show
+	if _fill:
+		_fill.visible = show
 	if not show:
 		value = 0.0
 
 
 func set_progress(ratio: float, color_override: Variant = null) -> void:
+	show_bar(true)
 	if color_override is Color:
 		fill_color = color_override
 	value = ratio
+
+
+func show_complete_check(show: bool) -> void:
+	visible = show
+	if _frame:
+		_frame.visible = false
+	if _bg:
+		_bg.visible = false
+	if _fill:
+		_fill.visible = false
+	if _check:
+		_check.visible = show
+	if not show:
+		value = 0.0

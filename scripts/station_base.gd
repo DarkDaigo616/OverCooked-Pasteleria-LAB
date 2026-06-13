@@ -62,6 +62,8 @@ func set_highlighted(active: bool) -> void:
 
 
 func get_display_name() -> String:
+	if has_meta("display_name"):
+		return str(get_meta("display_name"))
 	if has_node("StationLabel"):
 		return ($StationLabel as Label3D).text
 	return station_name
