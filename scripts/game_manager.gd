@@ -25,8 +25,7 @@ func start_game():
 		hud.update_orders(order_manager.get_active_orders())
 	print("=== ¡JUEGO INICIADO! ===")
 	print("Instrucciones:")
-	print("- Click izquierdo: Mover")
-	print("- E o Espacio: Interactuar")
+	print("- Click izquierdo: mover o interactuar")
 	print("- Q: Soltar objeto")
 	print("¡Completa las órdenes antes de que se acabe el tiempo!")
 

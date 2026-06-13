@@ -2,6 +2,7 @@ extends CharacterBody3D
 class_name ChefPlayer
 
 const CHEF_MODEL_PATH := "res://assets/{models,textures,sounds}/KayKit_Restaurant_Bits_1.0_FREE/Assets/fbx/Chef.fbx"
+const HELD_BASE_SCALE_META := "_held_base_scale"
 
 @export var speed: float = 5.0
 @export var acceleration: float = 15.0
@@ -14,6 +15,7 @@ const CHEF_MODEL_PATH := "res://assets/{models,textures,sounds}/KayKit_Restauran
 @export var model_yaw_offset_deg: float = 180.0
 @export var navigation_grid_size: float = 1.0
 @export var navigation_clearance: float = 0.65
+@export var held_item_scale_multiplier: float = 1.18
 
 var held_item: Node3D = null
 var movement_enabled: bool = true
@@ -21,6 +23,8 @@ var _interactables_in_range: Array[Node3D] = []
 var _level_bounds_half: float = 15.0
 var _spawn_position: Vector3 = Vector3.ZERO
 var _last_target: Node3D = null
+var _hover_target: Node3D = null
+var _pending_interaction_target: Node3D = null
 var _move_target: Vector3 = Vector3.ZERO
 var _has_move_target: bool = false
 var _path_points: Array[Vector3] = []
@@ -111,7 +115,9 @@ func _physics_process(delta: float) -> void:
 	if not movement_enabled:
 		velocity = Vector3.ZERO
 		return
+	_refresh_hover_target()
 	_refresh_nearby_interactables()
+	_process_pending_interaction()
 	handle_movement(delta)
 	handle_rotation(delta)
 	move_and_slide()
@@ -121,8 +127,6 @@ func _physics_process(delta: float) -> void:
 func _input(event: InputEvent) -> void:
 	if not movement_enabled:
 		return
-	if event.is_action_pressed("interact"):
-		attempt_interaction()
 	if event.is_action_pressed("drop") and held_item:
 		drop_item()
 
@@ -133,7 +137,17 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mouse_event := event as InputEventMouseButton
 		if mouse_event.button_index == MOUSE_BUTTON_LEFT and mouse_event.pressed:
-			_set_click_move_target(mouse_event.position)
+			_handle_left_click(mouse_event.position)
+
+
+func _handle_left_click(screen_position: Vector2) -> void:
+	if _hover_target and is_instance_valid(_hover_target):
+		_pending_interaction_target = _hover_target
+		_set_navigation_target(_interaction_position_for(_pending_interaction_target))
+		return
+
+	_pending_interaction_target = null
+	_set_click_move_target(screen_position)
 
 
 func _set_click_move_target(screen_position: Vector2) -> void:
@@ -172,6 +186,48 @@ func _set_navigation_target(target: Vector3) -> void:
 	_has_move_target = true
 
 
+func _refresh_hover_target() -> void:
+	var target := _get_mouse_hover_target()
+	_hover_target = target
+	_update_station_highlights(_hover_target)
+	_update_interaction_hud(_hover_target)
+
+
+func _get_mouse_hover_target() -> Node3D:
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		return null
+
+	var mouse_pos := get_viewport().get_mouse_position()
+	var ray_origin := camera.project_ray_origin(mouse_pos)
+	var ray_end := ray_origin + camera.project_ray_normal(mouse_pos) * 100.0
+	var query := PhysicsRayQueryParameters3D.create(
+		ray_origin,
+		ray_end,
+		PhysicsLayers.STATIONS | PhysicsLayers.ITEMS
+	)
+	query.collide_with_areas = false
+	query.collide_with_bodies = true
+
+	var result := get_world_3d().direct_space_state.intersect_ray(query)
+	if result.is_empty():
+		return null
+
+	return _find_clickable_root(result.get("collider") as Node)
+
+
+func _find_clickable_root(node: Node) -> Node3D:
+	var current := node
+	while current:
+		if current is Node3D:
+			if current.is_in_group("interactable") or current.is_in_group("dropped_item"):
+				return current as Node3D
+			if current.has_meta("is_ingredient"):
+				return current as Node3D
+		current = current.get_parent()
+	return null
+
+
 func _enforce_safe_position() -> void:
 	var p := global_position
 	p.x = clampf(p.x, -_level_bounds_half, _level_bounds_half)
@@ -194,10 +250,6 @@ func _refresh_nearby_interactables() -> void:
 		if gp.distance_to((node as Node3D).global_position) <= interact_range:
 			_interactables_in_range.append(node)
 
-	var target := _get_best_interactable()
-	_update_station_highlights(target)
-	_update_interaction_hud(target)
-
 
 func _update_station_highlights(target: Node3D) -> void:
 	if _last_target and is_instance_valid(_last_target) and _last_target.has_method("set_highlighted"):
@@ -213,12 +265,32 @@ func _update_interaction_hud(target: Node3D) -> void:
 		return
 	if target and target.has_method("get_display_name"):
 		hud.show_station_target(target.get_display_name())
+	elif target:
+		hud.show_station_target(_get_item_display_name(target))
 	else:
 		hud.clear_station_target()
 
 
 func _get_hud() -> GameHUD:
 	return get_tree().get_first_node_in_group("game_hud") as GameHUD
+
+
+func _get_item_display_name(item: Node3D) -> String:
+	if item.has_meta("display_name"):
+		return str(item.get_meta("display_name"))
+	var ingredient_type := str(item.get_meta("ingredient_type", item.name))
+	match ingredient_type:
+		"cake_batter":
+			return "Masa de pastel"
+		"cake":
+			var state := str(item.get_meta("state", ""))
+			if state == "baked":
+				return "Pastel horneado"
+			if state == "burned":
+				return "Pastel quemado"
+			return "Pastel"
+		_:
+			return ingredient_type.capitalize()
 
 
 func handle_movement(delta: float) -> void:
@@ -465,6 +537,39 @@ func attempt_interaction() -> void:
 			hud.flash_interaction()
 
 
+func _process_pending_interaction() -> void:
+	if _pending_interaction_target == null or not is_instance_valid(_pending_interaction_target):
+		_pending_interaction_target = null
+		return
+	if global_position.distance_to(_interaction_position_for(_pending_interaction_target)) > interact_range:
+		return
+
+	_has_move_target = false
+	velocity = Vector3.ZERO
+	if _pending_interaction_target.is_in_group("dropped_item"):
+		if not held_item and pickup_item(_pending_interaction_target):
+			_flash_hud_interaction()
+	else:
+		var target := _pending_interaction_target
+		if target.has_method("interact"):
+			target.interact(self)
+			interacted_with_station.emit(target)
+			_flash_hud_interaction()
+	_pending_interaction_target = null
+
+
+func _interaction_position_for(target: Node3D) -> Vector3:
+	var target_position := target.global_position
+	target_position.y = floor_y
+	return target_position
+
+
+func _flash_hud_interaction() -> void:
+	var hud := _get_hud()
+	if hud:
+		hud.flash_interaction()
+
+
 func _get_best_interactable() -> Node3D:
 	var best: Node3D = null
 	var best_score := INF
@@ -511,6 +616,7 @@ func pickup_item(item: Node3D) -> bool:
 	hand_position.add_child(item)
 	item.position = Vector3.ZERO
 	item.rotation = Vector3.ZERO
+	_apply_held_item_scale(item)
 	_set_item_physics_enabled(item, false)
 
 	item_picked_up.emit(item)
@@ -524,6 +630,7 @@ func take_item_from_hand() -> Node3D:
 	var item := held_item
 	hand_position.remove_child(item)
 	held_item = null
+	_restore_item_scale(item)
 	item_dropped.emit(item)
 	_refresh_hand_visuals()
 	return item
@@ -546,6 +653,7 @@ func drop_item() -> void:
 	var item := held_item
 	hand_position.remove_child(item)
 	get_parent().add_child(item)
+	_restore_item_scale(item)
 	var forward := _get_model_forward()
 	var drop_pos := global_position + forward * 1.2
 	drop_pos.y = floor_y + 0.35
@@ -563,6 +671,21 @@ func drop_item() -> void:
 func _refresh_hand_visuals() -> void:
 	if knife_hold_visual:
 		knife_hold_visual.visible = false
+
+
+func _apply_held_item_scale(item: Node3D) -> void:
+	if item == null:
+		return
+	if not item.has_meta(HELD_BASE_SCALE_META):
+		item.set_meta(HELD_BASE_SCALE_META, item.scale)
+	var base_scale := item.get_meta(HELD_BASE_SCALE_META) as Vector3
+	item.scale = base_scale * held_item_scale_multiplier
+
+
+func _restore_item_scale(item: Node3D) -> void:
+	if item == null or not item.has_meta(HELD_BASE_SCALE_META):
+		return
+	item.scale = item.get_meta(HELD_BASE_SCALE_META) as Vector3
 
 
 func _set_item_physics_enabled(item: Node3D, enabled: bool) -> void:

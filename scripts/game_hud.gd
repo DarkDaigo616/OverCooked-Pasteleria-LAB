@@ -25,14 +25,15 @@ var game_active: bool = true
 signal game_ended(final_score: int)
 
 
-const HINT_DEFAULT := "Click izquierdo: mover | E: usar/interactuar | Q: soltar"
+const HINT_DEFAULT := "Click en una estacion u objeto"
+const DELIVERY_FEEDBACK_DURATION := 3.5
 
-const ORDER_NAME_FONT := 16
-const ORDER_DETAIL_FONT := 15
-const ORDER_TIME_FONT := 15
-const ORDER_PANEL_WIDTH := 280
-const ORDER_PANEL_HEIGHT := 245
-const ORDER_OUTLINE_SIZE := 3
+const ORDER_NAME_FONT := 20
+const ORDER_DETAIL_FONT := 16
+const ORDER_TIME_FONT := 18
+const ORDER_PANEL_WIDTH := 380
+const ORDER_PANEL_HEIGHT := 270
+const ORDER_OUTLINE_SIZE := 1
 
 const INGREDIENT_NAMES := {
 	"cake": "Pastel",
@@ -49,14 +50,29 @@ const STATE_NAMES := {
 	"chopped": "cortado",
 }
 
-var _flash_tween: Tween
+var _delivery_feedback_tween: Tween
+var _interaction_flash_tween: Tween
+var _delivery_feedback_active := false
+var _hud_skin: Control
+var _action_panel: PanelContainer
+var _action_icon: TextureRect
+var _score_pill: PanelContainer
+var _timer_pill: PanelContainer
+var _pause_overlay: Control
+var _resume_button: Button
+var _pause_menu_button: Button
+var _click_player: AudioStreamPlayer
 var _order_panel_style: StyleBoxFlat
 var _max_order_slots: int = 4
+var _game_paused := false
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	add_to_group("game_hud")
+	_click_player = UITheme.make_sound_player(self, UITheme.CLICK_SOUND)
 	_resolve_orders_nodes()
+	_build_hud_layout()
 	_setup_top_labels()
 	_setup_orders_panel()
 	update_score(0)
@@ -64,6 +80,8 @@ func _ready() -> void:
 		_setup_hint_label()
 	if game_over_panel:
 		game_over_panel.visible = false
+		_setup_game_over_panel()
+	_build_pause_menu()
 	if menu_button:
 		menu_button.pressed.connect(_on_menu_pressed)
 	call_deferred("_sync_orders_from_manager")
@@ -78,16 +96,91 @@ func _resolve_orders_nodes() -> void:
 		orders_title = orders_panel.find_child("Title", true, false) as Label
 
 
+func _build_hud_layout() -> void:
+	_hud_skin = get_node_or_null("HudSkin") as Control
+	if _hud_skin == null:
+		_hud_skin = Control.new()
+		_hud_skin.name = "HudSkin"
+		_hud_skin.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_hud_skin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_hud_skin)
+
+	_score_pill = _make_panel("ScorePill", Vector2(285, 58), UITheme.COLOR_CARD, UITheme.COLOR_YELLOW)
+	_hud_skin.add_child(_score_pill)
+	_score_pill.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_score_pill.offset_left = -320
+	_score_pill.offset_top = 16
+	_score_pill.offset_right = -28
+	_score_pill.offset_bottom = 74
+	var score_row := HBoxContainer.new()
+	score_row.add_theme_constant_override("separation", 8)
+	score_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	score_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_score_pill.add_child(score_row)
+	score_row.add_child(UITheme.icon(UITheme.ICON_STAR, Vector2(34, 34)))
+	_reparent(score_label, score_row)
+
+	_timer_pill = _make_panel("TimerPill", Vector2(210, 62), Color(1.0, 0.96, 0.86, 0.98), Color(0.34, 0.29, 0.38))
+	_hud_skin.add_child(_timer_pill)
+	_timer_pill.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_timer_pill.offset_left = -105
+	_timer_pill.offset_top = 14
+	_timer_pill.offset_right = 105
+	_timer_pill.offset_bottom = 76
+	var timer_row := HBoxContainer.new()
+	timer_row.add_theme_constant_override("separation", 10)
+	timer_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_timer_pill.add_child(timer_row)
+	var timer_badge := Label.new()
+	timer_badge.text = "TIEMPO"
+	UITheme.apply_label(timer_badge, 14, UITheme.COLOR_MUTED)
+	timer_row.add_child(timer_badge)
+	_reparent(timer_label, timer_row)
+
+	if level_banner:
+		_reparent(level_banner, _hud_skin)
+		level_banner.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		level_banner.offset_left = 20
+		level_banner.offset_top = 16
+		level_banner.offset_right = 390
+		level_banner.offset_bottom = 54
+		level_banner.custom_minimum_size = Vector2(370, 38)
+
+	_action_panel = _make_panel("ActionPanel", Vector2(360, 72), Color(0.91, 0.97, 1.0, 0.98), UITheme.COLOR_BLUE)
+	_hud_skin.add_child(_action_panel)
+	_action_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_action_panel.offset_left = 20
+	_action_panel.offset_top = 368
+	_action_panel.offset_right = 380
+	_action_panel.offset_bottom = 440
+	var action_row := HBoxContainer.new()
+	action_row.add_theme_constant_override("separation", 10)
+	action_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_action_panel.add_child(action_row)
+	_action_icon = UITheme.icon(UITheme.ICON_CHECK, Vector2(28, 28))
+	action_row.add_child(_action_icon)
+	_reparent(interaction_hint, action_row)
+
+
+func _make_panel(name: String, min_size: Vector2, bg: Color, border: Color) -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.name = name
+	panel.custom_minimum_size = min_size
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_theme_stylebox_override("panel", UITheme.panel_style(bg, border, 3, 8))
+	return panel
+
+
+func _reparent(node: Node, new_parent: Node) -> void:
+	if node == null or new_parent == null:
+		return
+	if node.get_parent():
+		node.get_parent().remove_child(node)
+	new_parent.add_child(node)
+
+
 func _setup_orders_panel() -> void:
-	_order_panel_style = StyleBoxFlat.new()
-	_order_panel_style.bg_color = Color(0.11, 0.09, 0.08, 0.88)
-	_order_panel_style.border_color = Color(0.95, 0.72, 0.32, 0.9)
-	_order_panel_style.set_border_width_all(2)
-	_order_panel_style.set_corner_radius_all(8)
-	_order_panel_style.content_margin_left = 10
-	_order_panel_style.content_margin_right = 10
-	_order_panel_style.content_margin_top = 8
-	_order_panel_style.content_margin_bottom = 8
+	_order_panel_style = UITheme.panel_style(Color(1.0, 0.96, 0.84, 0.98), Color(0.48, 0.36, 0.28), 3, 8)
 
 	if not orders_panel:
 		push_warning("GameHUD: OrdersPanel no encontrado")
@@ -99,71 +192,153 @@ func _setup_orders_panel() -> void:
 	_place_orders_panel_top_right()
 
 	if orders_title:
-		_style_order_label(orders_title, 17, Color(1, 0.86, 0.42))
+		_style_order_label(orders_title, 20, UITheme.COLOR_INK)
 
 	if orders_container:
-		orders_container.add_theme_constant_override("separation", 8)
+		orders_container.add_theme_constant_override("separation", 10)
 
 	if orders_scroll:
 		orders_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		orders_scroll.custom_minimum_size = Vector2(ORDER_PANEL_WIDTH - 20, ORDER_PANEL_HEIGHT - 48)
+		orders_scroll.custom_minimum_size = Vector2(ORDER_PANEL_WIDTH - 24, ORDER_PANEL_HEIGHT - 50)
 
 
 func _setup_top_labels() -> void:
 	for label in [score_label, timer_label, level_label]:
 		if label == null:
 			continue
-		label.add_theme_color_override("font_color", Color(0.22, 0.13, 0.07))
-		label.add_theme_color_override("font_outline_color", Color(1.0, 0.94, 0.78, 0.95))
-		label.add_theme_constant_override("outline_size", 4)
+		UITheme.apply_label(label, 24, UITheme.COLOR_INK)
 	if score_label:
-		score_label.add_theme_font_size_override("font_size", 28)
+		score_label.custom_minimum_size = Vector2(188, 0)
+		score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		score_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		UITheme.apply_label(score_label, 20, UITheme.COLOR_INK)
 	if timer_label:
-		timer_label.add_theme_font_size_override("font_size", 28)
+		UITheme.apply_label(timer_label, 28, UITheme.COLOR_INK)
 	if level_label:
-		level_label.add_theme_font_size_override("font_size", 18)
-		level_label.add_theme_color_override("font_color", Color(1.0, 0.91, 0.68))
-		level_label.add_theme_color_override("font_outline_color", Color(0.06, 0.035, 0.02, 1.0))
-		level_label.add_theme_constant_override("outline_size", 3)
+		level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		UITheme.apply_label(level_label, 18, Color.WHITE, 1)
 	if level_banner:
-		var banner_style := StyleBoxFlat.new()
-		banner_style.bg_color = Color(0.13, 0.09, 0.06, 0.86)
-		banner_style.border_color = Color(0.95, 0.68, 0.28, 0.95)
-		banner_style.set_border_width_all(2)
-		banner_style.set_corner_radius_all(8)
-		banner_style.content_margin_left = 18
-		banner_style.content_margin_right = 18
-		banner_style.content_margin_top = 6
-		banner_style.content_margin_bottom = 6
-		level_banner.add_theme_stylebox_override("panel", banner_style)
+		level_banner.add_theme_stylebox_override("panel", UITheme.panel_style(UITheme.COLOR_BLUE, UITheme.COLOR_BLUE.darkened(0.25), 2, 8))
 
 
 func _setup_hint_label() -> void:
 	interaction_hint.visible = true
+	interaction_hint.custom_minimum_size = Vector2(0, 30)
+	interaction_hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	interaction_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	interaction_hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	UITheme.apply_label(interaction_hint, 19, UITheme.COLOR_INK)
+	_restore_default_hint()
+
+
+func _setup_game_over_panel() -> void:
+	game_over_panel.add_theme_stylebox_override(
+		"panel",
+		UITheme.panel_style(Color(0.98, 0.94, 0.84, 0.98), Color(0.3, 0.24, 0.34), 4, 8)
+	)
+	var title := game_over_panel.find_child("Title", true, false) as Label
+	if title:
+		UITheme.apply_label(title, 42, UITheme.COLOR_INK, 1)
+	if final_score_label:
+		UITheme.apply_label(final_score_label, 28, UITheme.COLOR_MUTED)
+	if menu_button:
+		menu_button.custom_minimum_size = Vector2(0, 58)
+		menu_button.icon = UITheme.texture(UITheme.ICON_PLAY)
+		menu_button.add_theme_constant_override("icon_max_width", 26)
+		UITheme.apply_button(menu_button, UITheme.COLOR_BLUE, Color(0.32, 0.67, 0.9), Color(0.16, 0.44, 0.66))
+
+
+func _build_pause_menu() -> void:
+	_pause_overlay = Control.new()
+	_pause_overlay.name = "PauseOverlay"
+	_pause_overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	_pause_overlay.visible = false
+	_pause_overlay.z_index = 200
+	_pause_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	_pause_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_pause_overlay)
+
+	var dim := ColorRect.new()
+	dim.color = Color(0.04, 0.05, 0.08, 0.52)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_pause_overlay.add_child(dim)
+
+	var panel := PanelContainer.new()
+	panel.set_anchors_preset(Control.PRESET_CENTER)
+	panel.offset_left = -210
+	panel.offset_top = -150
+	panel.offset_right = 210
+	panel.offset_bottom = 150
+	panel.add_theme_stylebox_override("panel", UITheme.panel_style(Color(1.0, 0.95, 0.82, 0.98), Color(0.3, 0.24, 0.34), 4, 8))
+	_pause_overlay.add_child(panel)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 24)
+	margin.add_theme_constant_override("margin_right", 24)
+	margin.add_theme_constant_override("margin_top", 22)
+	margin.add_theme_constant_override("margin_bottom", 22)
+	panel.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 16)
+	margin.add_child(vbox)
+
+	var title := Label.new()
+	title.text = "PAUSA"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.apply_label(title, 42, UITheme.COLOR_INK, 1)
+	vbox.add_child(title)
+
+	_resume_button = Button.new()
+	_resume_button.text = "Regresar al juego"
+	_resume_button.icon = UITheme.texture(UITheme.ICON_PLAY)
+	_resume_button.custom_minimum_size = Vector2(0, 58)
+	_resume_button.add_theme_constant_override("icon_max_width", 26)
+	UITheme.apply_button(_resume_button, UITheme.COLOR_GREEN, Color(0.2, 0.82, 0.5), Color(0.12, 0.55, 0.3))
+	_resume_button.pressed.connect(_on_resume_pressed)
+	vbox.add_child(_resume_button)
+
+	_pause_menu_button = Button.new()
+	_pause_menu_button.text = "Menu principal"
+	_pause_menu_button.icon = UITheme.texture(UITheme.ICON_CLOSE)
+	_pause_menu_button.custom_minimum_size = Vector2(0, 58)
+	_pause_menu_button.add_theme_constant_override("icon_max_width", 26)
+	UITheme.apply_button(_pause_menu_button, UITheme.COLOR_BLUE, Color(0.32, 0.67, 0.9), Color(0.16, 0.44, 0.66))
+	_pause_menu_button.pressed.connect(_on_pause_menu_pressed)
+	vbox.add_child(_pause_menu_button)
+
+
+func _restore_default_hint() -> void:
+	if not interaction_hint:
+		return
 	interaction_hint.text = HINT_DEFAULT
-	interaction_hint.add_theme_font_size_override("font_size", 22)
-	interaction_hint.add_theme_color_override("font_color", Color(0.22, 0.13, 0.07))
-	interaction_hint.add_theme_color_override("font_outline_color", Color(1.0, 0.94, 0.78, 1))
-	interaction_hint.add_theme_constant_override("outline_size", 4)
+	interaction_hint.add_theme_color_override("font_color", UITheme.COLOR_INK)
+	if _action_icon:
+		_action_icon.texture = UITheme.texture(UITheme.ICON_CHECK)
+	if _action_panel:
+		_action_panel.add_theme_stylebox_override("panel", UITheme.panel_style(Color(0.91, 0.97, 1.0, 0.98), UITheme.COLOR_BLUE, 3, 8))
 
 
 func _place_orders_panel_top_right() -> void:
 	var parent_vbox := orders_panel.get_parent()
 	if parent_vbox:
 		parent_vbox.remove_child(orders_panel)
-	add_child(orders_panel)
-	move_child(orders_panel, -1)
+	if _hud_skin:
+		_hud_skin.add_child(orders_panel)
+	else:
+		add_child(orders_panel)
 
-	orders_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	orders_panel.offset_left = -ORDER_PANEL_WIDTH - 16
-	orders_panel.offset_top = 70
-	orders_panel.offset_right = -16
-	orders_panel.offset_bottom = 68 + ORDER_PANEL_HEIGHT
+	orders_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	orders_panel.offset_left = 20
+	orders_panel.offset_top = 82
+	orders_panel.offset_right = 20 + ORDER_PANEL_WIDTH
+	orders_panel.offset_bottom = 82 + ORDER_PANEL_HEIGHT
 	orders_panel.custom_minimum_size = Vector2(ORDER_PANEL_WIDTH, ORDER_PANEL_HEIGHT)
 
 	var inner := orders_panel.get_node_or_null("VBoxContainer") as VBoxContainer
 	if inner:
-		inner.custom_minimum_size.x = ORDER_PANEL_WIDTH - 16
+		inner.custom_minimum_size.x = ORDER_PANEL_WIDTH - 20
 
 
 func _sync_orders_from_manager() -> void:
@@ -174,64 +349,90 @@ func _sync_orders_from_manager() -> void:
 
 
 func _style_order_label(label: Label, font_size: int, color: Color) -> void:
-	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("font_color", color)
-	label.add_theme_constant_override("outline_size", ORDER_OUTLINE_SIZE)
-	label.add_theme_color_override("font_outline_color", Color(0.08, 0.05, 0.03, 0.95))
+	UITheme.apply_label(label, font_size, color, ORDER_OUTLINE_SIZE)
 
 
 func show_station_target(station_name: String) -> void:
 	if not interaction_hint:
 		return
-	interaction_hint.text = "[ E ]  " + station_name
-	interaction_hint.add_theme_color_override("font_color", Color(0.24, 0.13, 0.05))
+	if _delivery_feedback_active:
+		return
+	interaction_hint.text = "Click para usar: " + station_name
+	interaction_hint.add_theme_color_override("font_color", UITheme.COLOR_INK)
+	if _action_panel:
+		_action_panel.add_theme_stylebox_override("panel", UITheme.panel_style(Color(0.91, 0.97, 1.0, 0.98), UITheme.COLOR_BLUE, 3, 8))
 
 
 func clear_station_target() -> void:
 	if not interaction_hint:
 		return
-	interaction_hint.text = HINT_DEFAULT
-	interaction_hint.add_theme_color_override("font_color", Color(0.22, 0.13, 0.07))
+	if _delivery_feedback_active:
+		return
+	_restore_default_hint()
 
 
 func show_delivery_feedback(message: String, success: bool) -> void:
 	if not interaction_hint:
 		return
+	_delivery_feedback_active = true
 	interaction_hint.text = message
 	if success:
-		interaction_hint.add_theme_color_override("font_color", Color(0.45, 1.0, 0.65))
+		if _action_icon:
+			_action_icon.texture = UITheme.texture(UITheme.ICON_CHECK)
+		interaction_hint.add_theme_color_override("font_color", Color(0.05, 0.38, 0.18))
+		if _action_panel:
+			_action_panel.add_theme_stylebox_override("panel", UITheme.panel_style(Color(0.83, 1.0, 0.88, 0.98), UITheme.COLOR_GREEN, 3, 8))
 	else:
-		interaction_hint.add_theme_color_override("font_color", Color(1.0, 0.45, 0.4))
-	if _flash_tween and _flash_tween.is_valid():
-		_flash_tween.kill()
-	_flash_tween = create_tween()
-	_flash_tween.tween_interval(2.5)
-	_flash_tween.tween_callback(clear_station_target)
+		if _action_icon:
+			_action_icon.texture = UITheme.texture(UITheme.ICON_CLOSE)
+		interaction_hint.add_theme_color_override("font_color", Color(0.62, 0.08, 0.08))
+		if _action_panel:
+			_action_panel.add_theme_stylebox_override("panel", UITheme.panel_style(Color(1.0, 0.88, 0.84, 0.98), UITheme.COLOR_RED, 3, 8))
+	if _delivery_feedback_tween and _delivery_feedback_tween.is_valid():
+		_delivery_feedback_tween.kill()
+	_delivery_feedback_tween = create_tween()
+	_delivery_feedback_tween.tween_interval(DELIVERY_FEEDBACK_DURATION)
+	_delivery_feedback_tween.tween_callback(func():
+		_delivery_feedback_active = false
+		clear_station_target()
+	)
 
 
 func flash_interaction() -> void:
 	if not interaction_hint:
 		return
-	if _flash_tween and _flash_tween.is_valid():
-		_flash_tween.kill()
-	interaction_hint.add_theme_color_override("font_color", Color(0.4, 1.0, 0.5))
-	_flash_tween = create_tween()
-	_flash_tween.tween_interval(0.15)
-	_flash_tween.tween_callback(func():
-		if interaction_hint.text.begins_with("[ E ]"):
-			interaction_hint.add_theme_color_override("font_color", Color(1.0, 0.95, 0.35))
+	if _delivery_feedback_active:
+		return
+	if _interaction_flash_tween and _interaction_flash_tween.is_valid():
+		_interaction_flash_tween.kill()
+	interaction_hint.add_theme_color_override("font_color", UITheme.COLOR_GREEN)
+	_interaction_flash_tween = create_tween()
+	_interaction_flash_tween.tween_interval(0.15)
+	_interaction_flash_tween.tween_callback(func():
+		if interaction_hint.text.begins_with("Click"):
+			interaction_hint.add_theme_color_override("font_color", UITheme.COLOR_INK)
 		else:
-			interaction_hint.add_theme_color_override("font_color", Color(0.9, 0.9, 0.95))
+			interaction_hint.add_theme_color_override("font_color", UITheme.COLOR_MUTED)
 	)
 
 
 func _process(delta: float) -> void:
-	if game_active:
+	if game_active and not _game_paused:
 		game_time -= delta
 		if timer_label:
-			timer_label.text = "Tiempo: " + format_time(game_time)
+			timer_label.text = format_time(game_time)
 		if game_time <= 0:
 			end_game()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey:
+		var key_event := event as InputEventKey
+		if key_event.pressed and not key_event.echo and key_event.keycode == KEY_ESCAPE:
+			if game_over_panel and game_over_panel.visible:
+				return
+			_set_paused(not _game_paused)
+			get_viewport().set_input_as_handled()
 
 
 func format_time(seconds: float) -> String:
@@ -261,20 +462,21 @@ func update_orders(orders: Array) -> void:
 
 	if orders_title:
 		if orders.is_empty():
-			orders_title.text = "Ordenes activas (ninguna)"
+			orders_title.text = "Pedido"
 		else:
-			orders_title.text = "Ordenes activas (%d/%d)" % [orders.size(), _max_order_slots]
+			orders_title.text = "Pedido activo"
 
 	for child in orders_container.get_children():
 		child.queue_free()
 
 	for i in range(orders.size()):
-		orders_container.add_child(create_order_panel(orders[i], i + 1))
+		orders_container.add_child(create_order_card(orders[i], i + 1))
 
 	if orders.is_empty():
 		var empty := Label.new()
-		empty.text = "Esperando nuevas ordenes..."
-		_style_order_label(empty, ORDER_DETAIL_FONT, Color(0.75, 0.78, 0.85))
+		empty.text = "Esperando nuevo pedido..."
+		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_style_order_label(empty, ORDER_DETAIL_FONT, UITheme.COLOR_MUTED)
 		orders_container.add_child(empty)
 
 	if orders_scroll:
@@ -354,7 +556,117 @@ func create_order_panel(order: Dictionary, order_number: int = 1) -> PanelContai
 	return panel
 
 
+func create_order_card(order: Dictionary, _order_number: int = 1) -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.custom_minimum_size.x = ORDER_PANEL_WIDTH - 24
+	panel.add_theme_stylebox_override(
+		"panel",
+		UITheme.panel_style(Color(1.0, 0.98, 0.9, 1.0), Color(0.74, 0.58, 0.32), 2, 8, false)
+	)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_top", 12)
+	margin.add_theme_constant_override("margin_bottom", 12)
+	panel.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 10)
+	margin.add_child(vbox)
+
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 8)
+	header.custom_minimum_size = Vector2(0, 62)
+	vbox.add_child(header)
+
+	var icon_panel := PanelContainer.new()
+	icon_panel.custom_minimum_size = Vector2(54, 54)
+	icon_panel.add_theme_stylebox_override("panel", UITheme.panel_style(Color(1.0, 0.75, 0.25), Color(0.72, 0.45, 0.12), 2, 8, false))
+	var icon_label := Label.new()
+	icon_label.text = "PA"
+	icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_style_order_label(icon_label, 18, Color(0.34, 0.18, 0.08))
+	icon_panel.add_child(icon_label)
+	header.add_child(icon_panel)
+
+	var name_label := Label.new()
+	name_label.text = "Pedido: " + order["recipe"].recipe_name
+	name_label.custom_minimum_size = Vector2(0, 58)
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_style_order_label(name_label, ORDER_NAME_FONT, UITheme.COLOR_INK)
+	header.add_child(name_label)
+
+	var time_label := Label.new()
+	time_label.text = format_time(order["time_remaining"])
+	time_label.custom_minimum_size = Vector2(62, 44)
+	time_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_style_order_label(time_label, ORDER_TIME_FONT, UITheme.COLOR_RED)
+	header.add_child(time_label)
+
+	var steps := HBoxContainer.new()
+	steps.add_theme_constant_override("separation", 6)
+	steps.custom_minimum_size = Vector2(0, 36)
+	vbox.add_child(steps)
+	steps.add_child(_make_order_step("Ingredientes", UITheme.COLOR_GREEN))
+	steps.add_child(_make_order_arrow())
+	steps.add_child(_make_order_step("Hornear", UITheme.COLOR_BLUE))
+	steps.add_child(_make_order_arrow())
+	steps.add_child(_make_order_step("Entregar", UITheme.COLOR_YELLOW))
+
+	var ing_parts: PackedStringArray = []
+	for ing in order["recipe"].required_ingredients:
+		ing_parts.append(_format_ingredient_line(ing))
+
+	if not ing_parts.is_empty():
+		var ing_label := Label.new()
+		ing_label.text = "Necesitas: " + ", ".join(ing_parts)
+		ing_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		ing_label.custom_minimum_size = Vector2(ORDER_PANEL_WIDTH - 54, 38)
+		ing_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_style_order_label(ing_label, ORDER_DETAIL_FONT, UITheme.COLOR_MUTED)
+		vbox.add_child(ing_label)
+
+	var timer_updater := Timer.new()
+	timer_updater.wait_time = 0.2
+	timer_updater.timeout.connect(func():
+		if is_instance_valid(time_label):
+			time_label.text = format_time(order["time_remaining"])
+			if order["time_remaining"] < 10.0:
+				_style_order_label(time_label, ORDER_TIME_FONT, UITheme.COLOR_RED)
+			else:
+				_style_order_label(time_label, ORDER_TIME_FONT, UITheme.COLOR_INK)
+	)
+	timer_updater.autostart = true
+	panel.add_child(timer_updater)
+	return panel
+
+
+func _make_order_step(text: String, color: Color) -> Control:
+	var chip := PanelContainer.new()
+	chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	chip.add_theme_stylebox_override("panel", UITheme.panel_style(color, color.darkened(0.18), 2, 8, false))
+	var label := Label.new()
+	label.text = text
+	label.custom_minimum_size = Vector2(0, 30)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_style_order_label(label, 13, Color.WHITE)
+	chip.add_child(label)
+	return chip
+
+
+func _make_order_arrow() -> TextureRect:
+	return UITheme.icon(UITheme.ICON_ARROW, Vector2(20, 20))
+
+
 func end_game() -> void:
+	if _game_paused:
+		_set_paused(false)
 	game_active = false
 	if game_over_panel:
 		game_over_panel.visible = true
@@ -363,5 +675,31 @@ func end_game() -> void:
 	game_ended.emit(score)
 
 
+func _set_paused(paused: bool) -> void:
+	_game_paused = paused
+	get_tree().paused = paused
+	if _pause_overlay:
+		_pause_overlay.visible = paused
+	if paused and _click_player:
+		_click_player.play()
+
+
+func _on_resume_pressed() -> void:
+	if _click_player:
+		_click_player.play()
+	_set_paused(false)
+
+
+func _on_pause_menu_pressed() -> void:
+	if _click_player:
+		_click_player.play()
+	get_tree().paused = false
+	_game_paused = false
+	GameState.go_to_menu()
+
+
 func _on_menu_pressed() -> void:
+	if _click_player:
+		_click_player.play()
+	get_tree().paused = false
 	GameState.go_to_menu()

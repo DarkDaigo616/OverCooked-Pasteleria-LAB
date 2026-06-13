@@ -20,12 +20,14 @@ var fill_color: Color = Color(0.25, 0.85, 0.35):
 var _bg: MeshInstance3D
 var _frame: MeshInstance3D
 var _fill: MeshInstance3D
+var _check: Sprite3D
 
 
 func _ready() -> void:
 	position.y = y_offset
 	position.z = z_offset
 	_build_meshes()
+	_build_check()
 	visible = false
 	_update_fill()
 
@@ -63,6 +65,20 @@ func _build_meshes() -> void:
 	_update_fill()
 
 
+func _build_check() -> void:
+	_check = Sprite3D.new()
+	_check.name = "CompleteCheck"
+	_check.texture = UITheme.texture("PNG/Green/Double/check_square_grey_checkmark.png")
+	_check.pixel_size = 0.011
+	_check.scale = Vector3(1.55, 1.55, 1.0)
+	_check.modulate = Color.WHITE
+	_check.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_check.no_depth_test = true
+	_check.render_priority = 8
+	_check.visible = false
+	add_child(_check)
+
+
 func _apply_fill_color() -> void:
 	if not _fill:
 		return
@@ -83,11 +99,34 @@ func _update_fill() -> void:
 
 func show_bar(show: bool) -> void:
 	visible = show
+	if _check:
+		_check.visible = false
+	if _frame:
+		_frame.visible = show
+	if _bg:
+		_bg.visible = show
+	if _fill:
+		_fill.visible = show
 	if not show:
 		value = 0.0
 
 
 func set_progress(ratio: float, color_override: Variant = null) -> void:
+	show_bar(true)
 	if color_override is Color:
 		fill_color = color_override
 	value = ratio
+
+
+func show_complete_check(show: bool) -> void:
+	visible = show
+	if _frame:
+		_frame.visible = false
+	if _bg:
+		_bg.visible = false
+	if _fill:
+		_fill.visible = false
+	if _check:
+		_check.visible = show
+	if not show:
+		value = 0.0
