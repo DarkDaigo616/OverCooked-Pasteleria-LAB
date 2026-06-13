@@ -63,16 +63,7 @@ static func _base_station(
 	col.shape = shape
 	body.add_child(col)
 
-	if ResourceLoader.exists(mesh_path):
-		var mesh: Mesh = load(mesh_path)
-		if mesh:
-			var mi := MeshInstance3D.new()
-			mi.name = "StationMesh"
-			mi.mesh = mesh
-			mi.scale = Vector3.ONE * MESH_SCALE
-			mi.position.y = 0.08
-			body.add_child(mi)
-	else:
+	if not _add_asset_child(body, mesh_path, "StationMesh", Vector3.ONE * MESH_SCALE, Vector3(0, 0.08, 0)):
 		_add_fallback_counter(body, station_type)
 
 	var label := Label3D.new()
@@ -112,6 +103,26 @@ static func _add_fallback_counter(body: StaticBody3D, station_type: String) -> v
 			_add_oven_props(body, accent)
 		"delivery":
 			_add_delivery_props(body, accent)
+
+
+static func _add_asset_child(parent: Node3D, path: String, node_name: String, scale: Vector3, pos: Vector3) -> bool:
+	if not ResourceLoader.exists(path):
+		return false
+	var res := load(path)
+	var node: Node3D = null
+	if res is PackedScene:
+		node = (res as PackedScene).instantiate() as Node3D
+	elif res is Mesh:
+		var mi := MeshInstance3D.new()
+		mi.mesh = res as Mesh
+		node = mi
+	if node == null:
+		return false
+	node.name = node_name
+	node.scale = scale
+	node.position = pos
+	parent.add_child(node)
+	return true
 
 
 static func _make_mat(color: Color, emission: float = 0.0) -> StandardMaterial3D:
@@ -234,7 +245,7 @@ static func _build_delivery(data: Dictionary) -> StaticBody3D:
 	var body := _base_station(
 		data.get("pos", Vector3.ZERO),
 		LABELS["delivery"],
-		BASE + "wall_orderwindow.obj",
+		BASE + "wall_orderwindow_decorated.obj",
 		"delivery"
 	)
 	body.set_script(load("res://scripts/delivery_window.gd"))

@@ -20,19 +20,35 @@ const FLOOR_COLOR_A := Color(0.62, 0.48, 0.34)
 const FLOOR_COLOR_B := Color(0.74, 0.62, 0.46)
 const FLOOR_BORDER_COLOR := Color(0.36, 0.22, 0.13)
 
-const DECO_MESHES: Array[String] = [
-	"fridge_A.obj",
-	"table_round_A_decorated.obj",
-	"table_round_B.obj",
-	"chair_A.obj",
-	"chair_B.obj",
-	"shelf_papertowel_decorated.obj",
-	"kitchencabinet.obj",
-	"pillar_A.obj",
-	"pillar_B.obj",
-	"extractorhood.obj",
-	"menu.obj",
-	"stew_pot.obj",
+const ASSET_BASE := "res://assets/{models,textures,sounds}/KayKit_Restaurant_Bits_1.0_FREE/Assets/obj/"
+const DECORATION_SPECS := [
+	{"asset": "fridge_A_decorated.obj", "pos": Vector3(-14.2, 0, -11.8), "scale": 0.9, "rot": 90.0},
+	{"asset": "fridge_A.obj", "pos": Vector3(-14.2, 0, -8.6), "scale": 0.9, "rot": 90.0},
+	{"asset": "kitchencounter_straight_A_decorated.obj", "pos": Vector3(-9.8, 0, -14.2), "scale": 0.9, "rot": 0.0},
+	{"asset": "kitchencounter_sink_backsplash.obj", "pos": Vector3(-6.7, 0, -14.2), "scale": 0.9, "rot": 0.0},
+	{"asset": "stove_multi_decorated.obj", "pos": Vector3(-2.8, 0, -14.1), "scale": 0.92, "rot": 0.0},
+	{"asset": "extractorhood.obj", "pos": Vector3(-2.8, 1.15, -14.4), "scale": 0.9, "rot": 0.0},
+	{"asset": "shelf_papertowel_decorated.obj", "pos": Vector3(2.2, 0, -14.3), "scale": 0.9, "rot": 0.0},
+	{"asset": "kitchencabinet.obj", "pos": Vector3(5.4, 0, -14.2), "scale": 0.9, "rot": 0.0},
+	{"asset": "wall_orderwindow_decorated.obj", "pos": Vector3(10.3, 0, -14.3), "scale": 0.95, "rot": 0.0},
+	{"asset": "menu.obj", "pos": Vector3(13.9, 0.1, -10.4), "scale": 0.85, "rot": -90.0},
+	{"asset": "kitchentable_A_large_decorated.obj", "pos": Vector3(-6.2, 0, 7.8), "scale": 0.82, "rot": 90.0},
+	{"asset": "cuttingboard.obj", "pos": Vector3(-6.2, 1.08, 7.8), "scale": 0.85, "rot": 20.0},
+	{"asset": "knife.obj", "pos": Vector3(-5.7, 1.16, 7.65), "scale": 0.8, "rot": -20.0},
+	{"asset": "dishrack_plates.obj", "pos": Vector3(-11.6, 0, 8.8), "scale": 0.88, "rot": 90.0},
+	{"asset": "pot_A_stew.obj", "pos": Vector3(-0.2, 1.08, -5.0), "scale": 0.75, "rot": 0.0},
+	{"asset": "pan_A.obj", "pos": Vector3(0.55, 1.1, -5.1), "scale": 0.75, "rot": 35.0},
+	{"asset": "crate_buns.obj", "pos": Vector3(-9.7, 0, 2.2), "scale": 0.8, "rot": 18.0},
+	{"asset": "crate_tomatoes.obj", "pos": Vector3(-11.6, 0, 1.0), "scale": 0.8, "rot": -12.0},
+	{"asset": "table_round_A_decorated.obj", "pos": Vector3(12.2, 0, 8.0), "scale": 0.9, "rot": 0.0},
+	{"asset": "chair_A.obj", "pos": Vector3(12.2, 0, 5.9), "scale": 0.88, "rot": 180.0},
+	{"asset": "chair_B.obj", "pos": Vector3(14.2, 0, 8.0), "scale": 0.88, "rot": -90.0},
+	{"asset": "chair_A.obj", "pos": Vector3(10.2, 0, 8.0), "scale": 0.88, "rot": 90.0},
+	{"asset": "table_round_B.obj", "pos": Vector3(12.7, 0, 12.7), "scale": 0.82, "rot": 25.0},
+	{"asset": "chair_stool.obj", "pos": Vector3(10.9, 0, 12.7), "scale": 0.82, "rot": 90.0},
+	{"asset": "chair_stool.obj", "pos": Vector3(14.5, 0, 12.7), "scale": 0.82, "rot": -90.0},
+	{"asset": "pillar_A.obj", "pos": Vector3(-15.2, 0, 14.2), "scale": 0.95, "rot": 0.0},
+	{"asset": "pillar_B.obj", "pos": Vector3(15.2, 0, 14.2), "scale": 0.95, "rot": 0.0},
 ]
 
 
@@ -130,42 +146,53 @@ func _build_decorations(level_id: int) -> void:
 	for child in decor_root.get_children():
 		child.queue_free()
 
-	var base := "res://assets/{models,textures,sounds}/KayKit_Restaurant_Bits_1.0_FREE/Assets/obj/"
-	# Decoracion solo en esquinas lejanas (no tapa estaciones)
-	var corners := [
-		Vector3(-15.5, 0, -15.5), Vector3(15.5, 0, -15.5),
-		Vector3(-15.5, 0, 15.5), Vector3(15.5, 0, 15.5),
-	]
-	for i in range(corners.size()):
-		var mesh_name: String = DECO_MESHES[i % DECO_MESHES.size()]
-		_spawn_deco(base + mesh_name, corners[i], 0.85)
+	for spec in DECORATION_SPECS:
+		_spawn_deco_asset(
+			spec.get("asset", ""),
+			spec.get("pos", Vector3.ZERO),
+			spec.get("scale", 1.0),
+			spec.get("rot", 0.0)
+		)
 
 	match level_id:
 		1:
-			_spawn_deco(base + "menu.obj", Vector3(-15, 0, 14), 0.9)
+			_spawn_deco_asset("plate.obj", Vector3(8.2, 1.15, 0.3), 0.7, 12.0)
+			_spawn_deco_asset("stew_bowl.obj", Vector3(7.7, 1.18, -0.25), 0.68, -18.0)
 		2:
-			_spawn_deco(base + "menu.obj", Vector3(15, 0, 14), 0.9)
+			_spawn_deco_asset("menu.obj", Vector3(15, 0, 14), 0.9, -90.0)
 		3:
-			_spawn_deco(base + "extractorhood.obj", Vector3(0, 0, -15), 0.85)
+			_spawn_deco_asset("extractorhood.obj", Vector3(0, 0, -15), 0.85, 0.0)
 		4:
-			_spawn_deco(base + "pillar_A.obj", Vector3(-15, 0, 0), 1.0)
-			_spawn_deco(base + "pillar_B.obj", Vector3(15, 0, 0), 1.0)
+			_spawn_deco_asset("pillar_A.obj", Vector3(-15, 0, 0), 1.0, 0.0)
+			_spawn_deco_asset("pillar_B.obj", Vector3(15, 0, 0), 1.0, 0.0)
 		5:
-			_spawn_deco(base + "fridge_A.obj", Vector3(-15.5, 0, 8), 0.9)
-			_spawn_deco(base + "fridge_A.obj", Vector3(15.5, 0, 8), 0.9)
+			_spawn_deco_asset("fridge_A.obj", Vector3(-15.5, 0, 8), 0.9, 90.0)
+			_spawn_deco_asset("fridge_A.obj", Vector3(15.5, 0, 8), 0.9, -90.0)
 
 
-func _spawn_deco(mesh_path: String, pos: Vector3, scale_mul: float) -> void:
-	if not ResourceLoader.exists(mesh_path):
+func _spawn_deco_asset(asset_name: String, pos: Vector3, scale_mul: float, rotation_y_degrees: float) -> void:
+	if asset_name.is_empty():
 		return
-	var mesh: Mesh = load(mesh_path)
-	if not mesh:
+	_spawn_deco(ASSET_BASE + asset_name, pos, scale_mul, rotation_y_degrees)
+
+
+func _spawn_deco(asset_path: String, pos: Vector3, scale_mul: float, rotation_y_degrees: float) -> void:
+	if not ResourceLoader.exists(asset_path):
 		return
-	var mi := MeshInstance3D.new()
-	mi.mesh = mesh
-	mi.position = pos
-	mi.scale = Vector3.ONE * scale_mul
-	decor_root.add_child(mi)
+	var res := load(asset_path)
+	var node: Node3D = null
+	if res is PackedScene:
+		node = (res as PackedScene).instantiate() as Node3D
+	elif res is Mesh:
+		var mi := MeshInstance3D.new()
+		mi.mesh = res as Mesh
+		node = mi
+	if node == null:
+		return
+	node.position = pos
+	node.scale = Vector3.ONE * scale_mul
+	node.rotation_degrees.y = rotation_y_degrees
+	decor_root.add_child(node)
 
 
 func _build_boundary_walls() -> void:

@@ -37,6 +37,14 @@ static func load_ingredient_mesh(ingredient_type: String, state: String) -> Mesh
 	return res as Mesh
 
 
+static func load_ingredient_scene(ingredient_type: String, state: String) -> PackedScene:
+	var path := ingredient_mesh_path(ingredient_type, state)
+	if path.is_empty() or not ResourceLoader.exists(path):
+		return null
+	var res = load(path)
+	return res as PackedScene
+
+
 static func plate_mesh_path() -> String:
 	return BASE + "plate_small.obj"
 
@@ -74,7 +82,11 @@ static func apply_ingredient_visual(root: Node3D, ingredient_type: String, state
 		var mi := set_mesh_on_first_mesh_instance(root, mesh, mesh_scale)
 		_tint_if_needed(mi, ingredient_type, state)
 	else:
-		_apply_fallback_ingredient_visual(root, ingredient_type, state, mesh_scale)
+		var scene := load_ingredient_scene(ingredient_type, state)
+		if scene:
+			_apply_scene_visual(root, scene, mesh_scale)
+		else:
+			_apply_fallback_ingredient_visual(root, ingredient_type, state, mesh_scale)
 
 
 static func _tint_if_needed(mi: MeshInstance3D, ingredient_type: String, state: String) -> void:
@@ -82,6 +94,15 @@ static func _tint_if_needed(mi: MeshInstance3D, ingredient_type: String, state: 
 		var mat := StandardMaterial3D.new()
 		mat.albedo_color = Color(0.85, 0.35, 0.15)
 		mi.material_override = mat
+
+
+static func _apply_scene_visual(root: Node3D, scene: PackedScene, mesh_scale: float) -> void:
+	var visual := _clear_generated_visual(root)
+	var node := scene.instantiate() as Node3D
+	if node == null:
+		return
+	node.scale = Vector3.ONE * mesh_scale
+	visual.add_child(node)
 
 
 static func _clear_generated_visual(root: Node3D) -> Node3D:
