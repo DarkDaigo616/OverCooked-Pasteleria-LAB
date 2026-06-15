@@ -15,7 +15,7 @@ const HELD_BASE_SCALE_META := "_held_base_scale"
 @export var model_yaw_offset_deg: float = 180.0
 @export var navigation_grid_size: float = 1.0
 @export var navigation_clearance: float = 0.65
-@export var held_item_scale_multiplier: float = 1.18
+@export var held_item_scale_multiplier: float = 1.85
 
 var held_item: Node3D = null
 var movement_enabled: bool = true
@@ -92,7 +92,7 @@ func _setup_chef_model() -> void:
 		hand_position.name = "HandPosition"
 		model.add_child(hand_position)
 
-	hand_position.position = Vector3(0.45, 0.95, 0.35)
+	hand_position.position = Vector3(0.55, 1.08, 0.42)
 
 
 func configure_level_bounds(half_size: float, spawn: Vector3) -> void:
@@ -281,13 +281,27 @@ func _get_item_display_name(item: Node3D) -> String:
 	var ingredient_type := str(item.get_meta("ingredient_type", item.name))
 	match ingredient_type:
 		"cake_batter":
-			return "Masa de pastel"
+			return "Masa de vainilla"
+		"bad_batter":
+			return "Masa incorrecta"
+		"flour":
+			return "Harina"
+		"egg":
+			return "Huevo"
+		"sugar":
+			return "Azucar"
 		"cake":
 			var state := str(item.get_meta("state", ""))
 			if state == "baked":
 				return "Pastel horneado"
 			if state == "burned":
 				return "Pastel quemado"
+			if state == "ruined_baked":
+				return "Pastel fallido"
+			if state == "decorated_vanilla":
+				return "Pastel de vainilla"
+			if state == "decorated_chocolate":
+				return "Pastel con chocolate"
 			return "Pastel"
 		_:
 			return ingredient_type.capitalize()

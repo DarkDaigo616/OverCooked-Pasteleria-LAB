@@ -105,7 +105,7 @@ func _build_showcase_panel() -> Control:
 	margin.add_child(vbox)
 
 	var eyebrow := Label.new()
-	eyebrow.text = "PASTELERIA DE UN CLICK"
+	eyebrow.text = "PASTELERIA EN CADENA"
 	UITheme.apply_label(eyebrow, 18, Color(0.23, 0.42, 0.45))
 	vbox.add_child(eyebrow)
 
@@ -115,7 +115,7 @@ func _build_showcase_panel() -> Control:
 	vbox.add_child(title)
 
 	var subtitle := Label.new()
-	subtitle.text = "Apunta, cocina y entrega antes de que el pedido se enfrie."
+	subtitle.text = "Toma ingredientes, mezcla, hornea, decora y entrega antes de que el pedido se enfrie."
 	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	UITheme.apply_label(subtitle, 20, UITheme.COLOR_MUTED)
 	vbox.add_child(subtitle)
@@ -168,23 +168,27 @@ func _build_recipe_preview() -> Control:
 	title_row.add_child(title_box)
 
 	var order_label := Label.new()
-	order_label.text = "Pedido: Pastel basico"
+	order_label.text = "Pedido: Pastel de vainilla"
 	UITheme.apply_label(order_label, 24, UITheme.COLOR_INK)
 	title_box.add_child(order_label)
 
 	var reward := Label.new()
-	reward.text = "100 puntos por entrega perfecta"
+	reward.text = "160 puntos por completar la cadena"
 	UITheme.apply_label(reward, 16, UITheme.COLOR_MUTED)
 	title_box.add_child(reward)
 
 	var steps := HBoxContainer.new()
 	steps.add_theme_constant_override("separation", 8)
 	vbox.add_child(steps)
-	steps.add_child(_make_step_chip("1", "Ingredientes", UITheme.COLOR_GREEN))
+	steps.add_child(_make_step_chip("1", "Ing.", UITheme.COLOR_GREEN))
 	steps.add_child(UITheme.icon(UITheme.ICON_ARROW, Vector2(26, 26)))
-	steps.add_child(_make_step_chip("2", "Hornear", UITheme.COLOR_BLUE))
+	steps.add_child(_make_step_chip("2", "Batir", UITheme.COLOR_BLUE))
 	steps.add_child(UITheme.icon(UITheme.ICON_ARROW, Vector2(26, 26)))
-	steps.add_child(_make_step_chip("3", "Entregar", UITheme.COLOR_YELLOW))
+	steps.add_child(_make_step_chip("3", "Horno", UITheme.COLOR_RED))
+	steps.add_child(UITheme.icon(UITheme.ICON_ARROW, Vector2(26, 26)))
+	steps.add_child(_make_step_chip("4", "Decorar", Color(0.95, 0.48, 0.72)))
+	steps.add_child(UITheme.icon(UITheme.ICON_ARROW, Vector2(26, 26)))
+	steps.add_child(_make_step_chip("5", "Entrega", UITheme.COLOR_YELLOW))
 
 	return card
 

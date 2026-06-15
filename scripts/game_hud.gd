@@ -27,17 +27,25 @@ signal game_ended(final_score: int)
 
 const HINT_DEFAULT := "Click en una estacion u objeto"
 const DELIVERY_FEEDBACK_DURATION := 3.5
+const RECIPE_BOOK_TEXTURES := {
+	1: "res://assets/ui/recipe_book_level1.png",
+	2: "res://assets/ui/recipe_book_level2.png",
+}
 
-const ORDER_NAME_FONT := 20
+const ORDER_NAME_FONT := 22
 const ORDER_DETAIL_FONT := 16
 const ORDER_TIME_FONT := 18
-const ORDER_PANEL_WIDTH := 380
-const ORDER_PANEL_HEIGHT := 270
+const ORDER_PANEL_WIDTH := 360
+const ORDER_PANEL_HEIGHT := 150
 const ORDER_OUTLINE_SIZE := 1
 
 const INGREDIENT_NAMES := {
 	"cake": "Pastel",
 	"cake_batter": "Masa",
+	"bad_batter": "Masa",
+	"flour": "Harina",
+	"egg": "Huevo",
+	"sugar": "Azucar",
 	"bread": "Pan",
 	"meat": "Carne",
 	"lettuce": "Lechuga",
@@ -45,6 +53,10 @@ const INGREDIENT_NAMES := {
 }
 const STATE_NAMES := {
 	"baked": "horneado",
+	"burned": "quemado",
+	"decorated_vanilla": "vainilla",
+	"decorated_chocolate": "chocolate",
+	"ruined_baked": "fallido",
 	"raw": "crudo",
 	"cooked": "cocido",
 	"chopped": "cortado",
@@ -65,6 +77,10 @@ var _click_player: AudioStreamPlayer
 var _order_panel_style: StyleBoxFlat
 var _max_order_slots: int = 4
 var _game_paused := false
+var _recipe_book_overlay: Control
+var _recipe_book_started_level := false
+var _recipe_book_paused_tree := false
+var _recipe_book_texture: TextureRect
 
 
 func _ready() -> void:
@@ -82,9 +98,11 @@ func _ready() -> void:
 		game_over_panel.visible = false
 		_setup_game_over_panel()
 	_build_pause_menu()
+	_build_recipe_book_overlay()
 	if menu_button:
 		menu_button.pressed.connect(_on_menu_pressed)
 	call_deferred("_sync_orders_from_manager")
+	call_deferred("_show_recipe_book_on_level_start")
 
 
 func _resolve_orders_nodes() -> void:
@@ -122,11 +140,11 @@ func _build_hud_layout() -> void:
 
 	_timer_pill = _make_panel("TimerPill", Vector2(210, 62), Color(1.0, 0.96, 0.86, 0.98), Color(0.34, 0.29, 0.38))
 	_hud_skin.add_child(_timer_pill)
-	_timer_pill.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_timer_pill.offset_left = -105
-	_timer_pill.offset_top = 14
-	_timer_pill.offset_right = 105
-	_timer_pill.offset_bottom = 76
+	_timer_pill.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_timer_pill.offset_left = 20
+	_timer_pill.offset_top = 62
+	_timer_pill.offset_right = 230
+	_timer_pill.offset_bottom = 124
 	var timer_row := HBoxContainer.new()
 	timer_row.add_theme_constant_override("separation", 10)
 	timer_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -148,11 +166,11 @@ func _build_hud_layout() -> void:
 
 	_action_panel = _make_panel("ActionPanel", Vector2(360, 72), Color(0.91, 0.97, 1.0, 0.98), UITheme.COLOR_BLUE)
 	_hud_skin.add_child(_action_panel)
-	_action_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	_action_panel.offset_left = 20
-	_action_panel.offset_top = 368
-	_action_panel.offset_right = 380
-	_action_panel.offset_bottom = 440
+	_action_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_action_panel.offset_left = -240
+	_action_panel.offset_top = -92
+	_action_panel.offset_right = 240
+	_action_panel.offset_bottom = -20
 	var action_row := HBoxContainer.new()
 	action_row.add_theme_constant_override("separation", 10)
 	action_row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -309,6 +327,95 @@ func _build_pause_menu() -> void:
 	vbox.add_child(_pause_menu_button)
 
 
+func _build_recipe_book_overlay() -> void:
+	_recipe_book_overlay = Control.new()
+	_recipe_book_overlay.name = "RecipeBookOverlay"
+	_recipe_book_overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	_recipe_book_overlay.visible = false
+	_recipe_book_overlay.z_index = 180
+	_recipe_book_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	_recipe_book_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_recipe_book_overlay)
+
+	var dim := ColorRect.new()
+	dim.color = Color(0.08, 0.06, 0.04, 0.56)
+	dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_recipe_book_overlay.add_child(dim)
+
+	var frame := Control.new()
+	frame.name = "BookFrame"
+	frame.set_anchors_preset(Control.PRESET_CENTER)
+	frame.offset_left = -610
+	frame.offset_top = -350
+	frame.offset_right = 610
+	frame.offset_bottom = 350
+	_recipe_book_overlay.add_child(frame)
+
+	_recipe_book_texture = TextureRect.new()
+	_recipe_book_texture.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_recipe_book_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_recipe_book_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	frame.add_child(_recipe_book_texture)
+
+	var close_button := Button.new()
+	close_button.text = ""
+	close_button.icon = UITheme.texture(UITheme.ICON_PLAY)
+	close_button.custom_minimum_size = Vector2(74, 62)
+	close_button.expand_icon = true
+	close_button.add_theme_constant_override("icon_max_width", 34)
+	close_button.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	close_button.offset_left = -37
+	close_button.offset_top = -84
+	close_button.offset_right = 37
+	close_button.offset_bottom = -22
+	UITheme.apply_button(close_button, UITheme.COLOR_GREEN, Color(0.2, 0.82, 0.5), Color(0.12, 0.55, 0.3))
+	close_button.pressed.connect(_on_recipe_book_close_pressed)
+	frame.add_child(close_button)
+	_refresh_recipe_book_content()
+
+
+func _refresh_recipe_book_content() -> void:
+	var level_id := GameState.selected_level
+	if _recipe_book_texture:
+		var texture_path: String = RECIPE_BOOK_TEXTURES.get(level_id, RECIPE_BOOK_TEXTURES[1])
+		_recipe_book_texture.texture = load(texture_path) as Texture2D
+
+
+func _show_recipe_book_on_level_start() -> void:
+	if _recipe_book_started_level:
+		return
+	_recipe_book_started_level = true
+	show_recipe_book(true)
+
+
+func show_recipe_book(pause_level: bool = true) -> void:
+	if _recipe_book_overlay == null:
+		return
+	_refresh_recipe_book_content()
+	_recipe_book_overlay.visible = true
+	if pause_level and not get_tree().paused:
+		_recipe_book_paused_tree = true
+		get_tree().paused = true
+	if _click_player:
+		_click_player.play()
+
+
+func hide_recipe_book() -> void:
+	if _recipe_book_overlay == null:
+		return
+	_recipe_book_overlay.visible = false
+	if _recipe_book_paused_tree:
+		get_tree().paused = false
+		_recipe_book_paused_tree = false
+
+
+func _on_recipe_book_close_pressed() -> void:
+	if _click_player:
+		_click_player.play()
+	hide_recipe_book()
+
+
 func _restore_default_hint() -> void:
 	if not interaction_hint:
 		return
@@ -329,11 +436,11 @@ func _place_orders_panel_top_right() -> void:
 	else:
 		add_child(orders_panel)
 
-	orders_panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	orders_panel.offset_left = 20
-	orders_panel.offset_top = 82
-	orders_panel.offset_right = 20 + ORDER_PANEL_WIDTH
-	orders_panel.offset_bottom = 82 + ORDER_PANEL_HEIGHT
+	orders_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	orders_panel.offset_left = -ORDER_PANEL_WIDTH - 28
+	orders_panel.offset_top = 86
+	orders_panel.offset_right = -28
+	orders_panel.offset_bottom = 86 + ORDER_PANEL_HEIGHT
 	orders_panel.custom_minimum_size = Vector2(ORDER_PANEL_WIDTH, ORDER_PANEL_HEIGHT)
 
 	var inner := orders_panel.get_node_or_null("VBoxContainer") as VBoxContainer
@@ -429,6 +536,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var key_event := event as InputEventKey
 		if key_event.pressed and not key_event.echo and key_event.keycode == KEY_ESCAPE:
+			if _recipe_book_overlay and _recipe_book_overlay.visible:
+				hide_recipe_book()
+				get_viewport().set_input_as_handled()
+				return
 			if game_over_panel and game_over_panel.visible:
 				return
 			_set_paused(not _game_paused)
@@ -560,29 +671,30 @@ func create_order_card(order: Dictionary, _order_number: int = 1) -> PanelContai
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.custom_minimum_size.x = ORDER_PANEL_WIDTH - 24
+	panel.custom_minimum_size.y = 96
 	panel.add_theme_stylebox_override(
 		"panel",
 		UITheme.panel_style(Color(1.0, 0.98, 0.9, 1.0), Color(0.74, 0.58, 0.32), 2, 8, false)
 	)
 
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 10)
-	margin.add_theme_constant_override("margin_right", 10)
-	margin.add_theme_constant_override("margin_top", 12)
-	margin.add_theme_constant_override("margin_bottom", 12)
+	margin.add_theme_constant_override("margin_left", 9)
+	margin.add_theme_constant_override("margin_right", 9)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_bottom", 8)
 	panel.add_child(margin)
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 10)
+	vbox.add_theme_constant_override("separation", 5)
 	margin.add_child(vbox)
 
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 8)
-	header.custom_minimum_size = Vector2(0, 62)
+	header.custom_minimum_size = Vector2(0, 42)
 	vbox.add_child(header)
 
 	var icon_panel := PanelContainer.new()
-	icon_panel.custom_minimum_size = Vector2(54, 54)
+	icon_panel.custom_minimum_size = Vector2(40, 40)
 	icon_panel.add_theme_stylebox_override("panel", UITheme.panel_style(Color(1.0, 0.75, 0.25), Color(0.72, 0.45, 0.12), 2, 8, false))
 	var icon_label := Label.new()
 	icon_label.text = "PA"
@@ -593,30 +705,20 @@ func create_order_card(order: Dictionary, _order_number: int = 1) -> PanelContai
 	header.add_child(icon_panel)
 
 	var name_label := Label.new()
-	name_label.text = "Pedido: " + order["recipe"].recipe_name
-	name_label.custom_minimum_size = Vector2(0, 58)
+	name_label.text = order["recipe"].recipe_name
+	name_label.custom_minimum_size = Vector2(0, 42)
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_style_order_label(name_label, ORDER_NAME_FONT, UITheme.COLOR_INK)
+	_style_order_label(name_label, 18, UITheme.COLOR_INK)
 	header.add_child(name_label)
 
 	var time_label := Label.new()
 	time_label.text = format_time(order["time_remaining"])
-	time_label.custom_minimum_size = Vector2(62, 44)
+	time_label.custom_minimum_size = Vector2(62, 42)
 	time_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_style_order_label(time_label, ORDER_TIME_FONT, UITheme.COLOR_RED)
 	header.add_child(time_label)
-
-	var steps := HBoxContainer.new()
-	steps.add_theme_constant_override("separation", 6)
-	steps.custom_minimum_size = Vector2(0, 36)
-	vbox.add_child(steps)
-	steps.add_child(_make_order_step("Ingredientes", UITheme.COLOR_GREEN))
-	steps.add_child(_make_order_arrow())
-	steps.add_child(_make_order_step("Hornear", UITheme.COLOR_BLUE))
-	steps.add_child(_make_order_arrow())
-	steps.add_child(_make_order_step("Entregar", UITheme.COLOR_YELLOW))
 
 	var ing_parts: PackedStringArray = []
 	for ing in order["recipe"].required_ingredients:
@@ -626,9 +728,9 @@ func create_order_card(order: Dictionary, _order_number: int = 1) -> PanelContai
 		var ing_label := Label.new()
 		ing_label.text = "Necesitas: " + ", ".join(ing_parts)
 		ing_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		ing_label.custom_minimum_size = Vector2(ORDER_PANEL_WIDTH - 54, 38)
+		ing_label.custom_minimum_size = Vector2(ORDER_PANEL_WIDTH - 52, 34)
 		ing_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		_style_order_label(ing_label, ORDER_DETAIL_FONT, UITheme.COLOR_MUTED)
+		_style_order_label(ing_label, 14, UITheme.COLOR_MUTED)
 		vbox.add_child(ing_label)
 
 	var timer_updater := Timer.new()
@@ -652,12 +754,45 @@ func _make_order_step(text: String, color: Color) -> Control:
 	chip.add_theme_stylebox_override("panel", UITheme.panel_style(color, color.darkened(0.18), 2, 8, false))
 	var label := Label.new()
 	label.text = text
-	label.custom_minimum_size = Vector2(0, 30)
+	label.custom_minimum_size = Vector2(0, 34)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_style_order_label(label, 13, Color.WHITE)
+	_style_order_label(label, 14, Color.WHITE)
 	chip.add_child(label)
 	return chip
+
+
+func _populate_order_steps(container: HBoxContainer, recipe: Recipe) -> void:
+	var step_specs := _get_order_step_specs(recipe)
+	for i in range(step_specs.size()):
+		var spec: Dictionary = step_specs[i]
+		container.add_child(_make_order_step(spec["label"], spec["color"]))
+		if i < step_specs.size() - 1:
+			container.add_child(_make_order_arrow())
+
+
+func _get_order_step_specs(recipe: Recipe) -> Array:
+	var needs_decoration := false
+	for ing in recipe.required_ingredients:
+		var entry := Recipe.normalize_entry(ing)
+		if str(entry["state"]).begins_with("decorated_"):
+			needs_decoration = true
+			break
+
+	if needs_decoration:
+		return [
+			{"label": "Ing.", "color": UITheme.COLOR_GREEN},
+			{"label": "Batir", "color": UITheme.COLOR_BLUE},
+			{"label": "Horno", "color": UITheme.COLOR_RED},
+			{"label": "Decorar", "color": Color(0.95, 0.48, 0.72)},
+			{"label": "Entrega", "color": UITheme.COLOR_YELLOW},
+		]
+
+	return [
+		{"label": "Ing.", "color": UITheme.COLOR_GREEN},
+		{"label": "Horno", "color": UITheme.COLOR_BLUE},
+		{"label": "Entrega", "color": UITheme.COLOR_YELLOW},
+	]
 
 
 func _make_order_arrow() -> TextureRect:

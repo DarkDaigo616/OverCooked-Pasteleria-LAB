@@ -7,6 +7,26 @@ class_name Recipe
 @export var preparation_time: float = 60.0
 @export var icon_color: Color = Color.YELLOW
 
+const TYPE_NAMES := {
+	"cake": "Pastel",
+	"cake_batter": "Masa",
+	"bad_batter": "Masa",
+	"flour": "Harina",
+	"egg": "Huevo",
+	"sugar": "Azucar",
+}
+
+const STATE_NAMES := {
+	"baked": "horneado",
+	"burned": "quemado",
+	"decorated_vanilla": "vainilla",
+	"decorated_chocolate": "chocolate",
+	"ruined_baked": "fallido",
+	"raw": "crudo",
+	"cooked": "cocido",
+	"chopped": "cortado",
+}
+
 
 func _init(p_name: String = "", p_ingredients: Array = [], p_points: int = 100, p_time: float = 60.0) -> void:
 	recipe_name = p_name
@@ -74,17 +94,23 @@ func get_match_result(ingredients: Array) -> Dictionary:
 		if not matched:
 			return {
 				"success": false,
-				"reason": "Falta o esta mal preparado: %s (%s)." % [
-					str(req["type"]).capitalize(), str(req["state"])
-				],
+				"reason": "Falta o esta mal preparado: %s." % format_entry(req),
 			}
 
 	return {"success": true, "reason": ""}
 
 
+static func format_entry(entry_data: Variant) -> String:
+	var entry := normalize_entry(entry_data)
+	var type_name: String = TYPE_NAMES.get(str(entry["type"]), str(entry["type"]).capitalize())
+	var state_name: String = STATE_NAMES.get(str(entry["state"]), str(entry["state"]))
+	if state_name.is_empty():
+		return type_name
+	return "%s (%s)" % [type_name, state_name]
+
+
 func get_description() -> String:
 	var desc := recipe_name + ":\n"
 	for ing in required_ingredients:
-		var n := normalize_entry(ing)
-		desc += "  - " + str(n["type"]).capitalize() + " (" + str(n["state"]) + ")\n"
+		desc += "  - " + format_entry(ing) + "\n"
 	return desc
