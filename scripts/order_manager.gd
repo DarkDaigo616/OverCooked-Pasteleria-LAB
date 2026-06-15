@@ -43,13 +43,25 @@ func _process(delta: float) -> void:
 
 
 func create_recipes() -> void:
-	var cake := Recipe.new(
+	available_recipes.clear()
+
+	if GameState.selected_level >= 2:
+		var vanilla_cake := Recipe.new(
+			"Pastel de vainilla",
+			[{"type": "cake", "state": "decorated_vanilla"}],
+			160,
+			90.0
+		)
+		available_recipes.append(vanilla_cake)
+		return
+
+	var baked_cake := Recipe.new(
 		"Pastel horneado",
 		[{"type": "cake", "state": "baked"}],
 		100,
 		60.0
 	)
-	available_recipes.append(cake)
+	available_recipes.append(baked_cake)
 
 
 func spawn_new_order() -> void:

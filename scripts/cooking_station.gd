@@ -42,7 +42,15 @@ func _process(delta: float) -> void:
 			item.set_meta("is_cake", true)
 			item.set_meta("display_name", "Pastel horneado")
 			item.set_meta(COOKING_PROGRESS_META, cook_time)
-			ItemVisuals.apply_ingredient_visual(item, "cake", "baked", 0.75)
+			ItemVisuals.apply_ingredient_visual(item, "cake", "baked", 0.95)
+		elif item.get_meta("ingredient_type", "") == "bad_batter":
+			item.name = "cake"
+			item.set_meta("ingredient_type", "cake")
+			item.set_meta("state", "ruined_baked")
+			item.set_meta("is_cake", true)
+			item.set_meta("display_name", "Pastel fallido")
+			item.set_meta(COOKING_PROGRESS_META, cook_time)
+			ItemVisuals.apply_ingredient_visual(item, "cake", "ruined_baked", 0.95)
 		else:
 			item.set_meta("state", "cooked")
 			item.set_meta(COOKING_PROGRESS_META, cook_time)
@@ -55,7 +63,7 @@ func _process(delta: float) -> void:
 		is_burned = true
 		is_cooking = false
 		if item.has_meta("ingredient_type"):
-			var burn_scale := 0.75 if item.get_meta("ingredient_type", "") == "cake" else 0.35
+			var burn_scale := 0.95 if item.get_meta("ingredient_type", "") == "cake" else 0.45
 			ItemVisuals.apply_ingredient_visual(item, item.get_meta("ingredient_type"), "burned", burn_scale)
 		if _progress_bar:
 			_progress_bar.show_bar(false)
@@ -71,6 +79,9 @@ func _update_cook_bar() -> void:
 	if cooking_timer < cook_time:
 		var ratio := cooking_timer / cook_time
 		_progress_bar.set_progress(ratio, Color(1.0, 0.62, 0.18))
+	elif burn_time < 900.0 and not is_burned:
+		var burn_ratio := (cooking_timer - cook_time) / maxf(burn_time, 0.1)
+		_progress_bar.set_progress(burn_ratio, Color(0.9, 0.12, 0.08))
 	else:
 		_progress_bar.show_complete_check(true)
 
@@ -79,11 +90,16 @@ func interact(player: ChefPlayer) -> void:
 	super.interact(player)
 	var held := player.get_held_item()
 
-	if held and current_items.is_empty():
-		if can_cook(held):
-			var item := player.take_item_from_hand()
-			if item:
-				place_item(item)
+	if held:
+		if current_items.is_empty():
+			if can_cook(held):
+				var item := player.take_item_from_hand()
+				if item:
+					place_item(item)
+			else:
+				_show_station_message("El horno necesita masa mezclada.", false)
+		else:
+			_show_station_message("El horno esta ocupado.", false)
 		return
 
 	if not current_items.is_empty() and not player.has_item():
@@ -98,7 +114,7 @@ func can_cook(item: Node3D) -> bool:
 	if not item.has_meta("is_ingredient"):
 		return false
 	var ing_type: String = item.get_meta("ingredient_type", "")
-	if ing_type == "cake_batter":
+	if ing_type == "cake_batter" or ing_type == "bad_batter":
 		return item.get_meta("state", "") == "raw"
 	if ing_type == "bread" or ing_type == "lettuce":
 		return false
@@ -148,3 +164,9 @@ func _store_interrupted_progress(item: Node3D) -> void:
 		return
 	var saved_progress := cooking_timer * (1.0 - progress_loss_on_remove)
 	item.set_meta(COOKING_PROGRESS_META, saved_progress)
+
+
+func _show_station_message(text: String, success: bool) -> void:
+	var hud := get_tree().get_first_node_in_group("game_hud") as GameHUD
+	if hud:
+		hud.show_delivery_feedback(text, success)

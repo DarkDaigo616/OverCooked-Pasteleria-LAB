@@ -3,8 +3,11 @@ class_name StationVisuals
 
 const TYPE_COLORS := {
 	"ingredient": Color(0.93, 0.64, 0.25),
+	"mix": Color(0.36, 0.58, 0.9),
 	"chop": Color(0.48, 0.68, 0.82),
 	"cook": Color(0.82, 0.28, 0.16),
+	"decorate": Color(0.95, 0.48, 0.72),
+	"recipe_book": Color(0.58, 0.42, 0.28),
 	"plate": Color(0.9, 0.84, 0.74),
 	"plating": Color(0.98, 0.78, 0.35),
 	"delivery": Color(0.42, 0.72, 0.52),
