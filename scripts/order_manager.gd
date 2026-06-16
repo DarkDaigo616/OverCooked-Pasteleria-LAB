@@ -5,6 +5,7 @@ signal order_completed(recipe: Recipe, points: int)
 signal order_failed(recipe: Recipe)
 signal new_order(recipe: Recipe)
 signal all_orders_updated(orders: Array)
+signal order_penalty_applied(penalty: int)
 
 @export var max_orders: int = 1
 @export var order_spawn_interval: float = 20.0
@@ -19,7 +20,9 @@ var orders_running: bool = true
 func _ready() -> void:
 	add_to_group("order_manager")
 	create_recipes()
-	spawn_new_order()
+	var initial_count := 2 if GameState.selected_level >= 3 else 1
+	for i in range(initial_count):
+		spawn_new_order()
 
 
 func stop_orders() -> void:
@@ -44,6 +47,33 @@ func _process(delta: float) -> void:
 
 func create_recipes() -> void:
 	available_recipes.clear()
+
+	if GameState.selected_level >= 3:
+		max_orders = 3
+		order_spawn_interval = 25.0
+
+		var simple_cake := Recipe.new(
+			"Pastel simple",
+			[{"type": "cake", "state": "baked"}],
+			80,
+			60.0
+		)
+		var chocolate_cake := Recipe.new(
+			"Pastel de chocolate",
+			[{"type": "cake", "state": "decorated_chocolate"}],
+			150,
+			90.0
+		)
+		var strawberry_cake := Recipe.new(
+			"Pastel con fresa",
+			[{"type": "cake", "state": "decorated_strawberry"}],
+			150,
+			90.0
+		)
+		available_recipes.append(simple_cake)
+		available_recipes.append(chocolate_cake)
+		available_recipes.append(strawberry_cake)
+		return
 
 	if GameState.selected_level >= 2:
 		var vanilla_cake := Recipe.new(
@@ -93,10 +123,17 @@ func check_delivery(ingredients: Array) -> Dictionary:
 		var recipe: Recipe = order["recipe"]
 		var result: Dictionary = recipe.get_match_result(normalized)
 		if result.success:
+			var bonus := _calculate_speed_bonus(order, recipe)
+			order["_awarded_points"] = recipe.points + bonus
 			complete_order(order)
-			return {"success": true, "points": recipe.points, "reason": "", "recipe_name": recipe.recipe_name}
+			return {
+				"success": true,
+				"points": recipe.points + bonus,
+				"bonus": bonus,
+				"reason": "",
+				"recipe_name": recipe.recipe_name
+			}
 
-	# Ninguna orden coincide: devolver pista de la orden mas parecida
 	var best_reason := "No coincide con ninguna orden activa."
 	for order in active_orders:
 		var recipe: Recipe = order["recipe"]
@@ -105,18 +142,32 @@ func check_delivery(ingredients: Array) -> Dictionary:
 			best_reason = "%s — %s" % [recipe.recipe_name, result.reason]
 			break
 
-	return {"success": false, "points": 0, "reason": best_reason}
+	return {"success": false, "points": 0, "bonus": 0, "reason": best_reason}
+
+
+func _calculate_speed_bonus(order: Dictionary, recipe: Recipe) -> int:
+	if GameState.selected_level < 3:
+		return 0
+	var time_remaining: float = order.get("time_remaining", 0.0)
+	if recipe.preparation_time <= 0:
+		return 0
+	if time_remaining > recipe.preparation_time * 0.5:
+		return int(recipe.points * 0.5)
+	return 0
 
 
 func complete_order(order: Dictionary) -> void:
 	active_orders.erase(order)
-	order_completed.emit(order["recipe"], order["recipe"].points)
+	var pts: int = order.get("_awarded_points", order["recipe"].points)
+	order_completed.emit(order["recipe"], pts)
 	all_orders_updated.emit(active_orders)
 
 
 func fail_order(order: Dictionary) -> void:
 	active_orders.erase(order)
 	order_failed.emit(order["recipe"])
+	if GameState.selected_level >= 3:
+		order_penalty_applied.emit(75)
 	all_orders_updated.emit(active_orders)
 
 

@@ -44,6 +44,7 @@ const LABELS := {
 	"cook": "Horno",
 	"decorate_vanilla": "Decoracion: Vainilla",
 	"decorate_chocolate": "Decoracion: Chocolate",
+	"decorate_strawberry": "Decoracion: Fresa",
 	"recipe_book": "Recetario",
 	"delivery": "Entregar",
 	"trash": "Basura",

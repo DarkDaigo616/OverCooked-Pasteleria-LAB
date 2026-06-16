@@ -21,6 +21,7 @@ const STATE_NAMES := {
 	"burned": "quemado",
 	"decorated_vanilla": "vainilla",
 	"decorated_chocolate": "chocolate",
+	"decorated_strawberry": "fresa",
 	"ruined_baked": "fallido",
 	"raw": "crudo",
 	"cooked": "cocido",

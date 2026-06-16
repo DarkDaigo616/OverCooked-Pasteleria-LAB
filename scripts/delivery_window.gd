@@ -99,7 +99,11 @@ func _finish_delivery() -> void:
 	var result := order_manager.check_delivery([entry])
 	if result.success:
 		order_delivered.emit(true, result.points)
-		_show_delivery_message("Pastel entregado! +%d puntos" % result.points, true)
+		var bonus: int = result.get("bonus", 0)
+		var msg := "Pastel entregado! +%d puntos" % result.points
+		if bonus > 0:
+			msg = "Entrega rapida! +%d pts  (+%d bonus)" % [result.points, bonus]
+		_show_delivery_message(msg, true)
 		clear_items()
 		if _progress_bar:
 			_progress_bar.show_complete_check(true)
@@ -126,7 +130,7 @@ func _validate_delivery_item(item: Node3D) -> Dictionary:
 			return {"success": false, "reason": "El pastel se quemo. Prepara otro."}
 		"ruined_baked":
 			return {"success": false, "reason": "La mezcla salio mal. Prepara otro."}
-		"decorated_vanilla", "decorated_chocolate":
+		"decorated_vanilla", "decorated_chocolate", "decorated_strawberry":
 			return {"success": true, "reason": ""}
 		_:
 			return {"success": false, "reason": "Ese pastel no esta terminado."}

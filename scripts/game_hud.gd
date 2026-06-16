@@ -30,13 +30,14 @@ const DELIVERY_FEEDBACK_DURATION := 3.5
 const RECIPE_BOOK_TEXTURES := {
 	1: "res://assets/ui/recipe_book_level1.png",
 	2: "res://assets/ui/recipe_book_level2.png",
+	3: "res://assets/ui/recipe_book_level2.png",
 }
 
 const ORDER_NAME_FONT := 22
 const ORDER_DETAIL_FONT := 16
 const ORDER_TIME_FONT := 18
-const ORDER_PANEL_WIDTH := 360
-const ORDER_PANEL_HEIGHT := 150
+const ORDER_PANEL_WIDTH := 380
+const ORDER_PANEL_HEIGHT := 168
 const ORDER_OUTLINE_SIZE := 1
 
 const INGREDIENT_NAMES := {
@@ -56,6 +57,7 @@ const STATE_NAMES := {
 	"burned": "quemado",
 	"decorated_vanilla": "vainilla",
 	"decorated_chocolate": "chocolate",
+	"decorated_strawberry": "fresa",
 	"ruined_baked": "fallido",
 	"raw": "crudo",
 	"cooked": "cocido",
@@ -428,6 +430,8 @@ func _restore_default_hint() -> void:
 
 
 func _place_orders_panel_top_right() -> void:
+	if not orders_panel:
+		return
 	var parent_vbox := orders_panel.get_parent()
 	if parent_vbox:
 		parent_vbox.remove_child(orders_panel)
@@ -436,12 +440,20 @@ func _place_orders_panel_top_right() -> void:
 	else:
 		add_child(orders_panel)
 
+	var panel_h: int = (
+		390 if _max_order_slots >= 3
+		else 230 if _max_order_slots == 2
+		else ORDER_PANEL_HEIGHT
+	)
 	orders_panel.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	orders_panel.offset_left = -ORDER_PANEL_WIDTH - 28
 	orders_panel.offset_top = 86
 	orders_panel.offset_right = -28
-	orders_panel.offset_bottom = 86 + ORDER_PANEL_HEIGHT
-	orders_panel.custom_minimum_size = Vector2(ORDER_PANEL_WIDTH, ORDER_PANEL_HEIGHT)
+	orders_panel.offset_bottom = 86 + panel_h
+	orders_panel.custom_minimum_size = Vector2(ORDER_PANEL_WIDTH, panel_h)
+
+	if orders_scroll:
+		orders_scroll.custom_minimum_size = Vector2(ORDER_PANEL_WIDTH - 24, panel_h - 50)
 
 	var inner := orders_panel.get_node_or_null("VBoxContainer") as VBoxContainer
 	if inner:
@@ -560,6 +572,7 @@ func update_score(points: int) -> void:
 
 func set_max_order_slots(slots: int) -> void:
 	_max_order_slots = maxi(slots, 1)
+	_place_orders_panel_top_right()
 
 
 func update_orders(orders: Array) -> void:
@@ -573,9 +586,11 @@ func update_orders(orders: Array) -> void:
 
 	if orders_title:
 		if orders.is_empty():
-			orders_title.text = "Pedido"
-		else:
+			orders_title.text = "Pedidos"
+		elif orders.size() == 1:
 			orders_title.text = "Pedido activo"
+		else:
+			orders_title.text = "Pedidos activos (%d)" % orders.size()
 
 	for child in orders_container.get_children():
 		child.queue_free()
@@ -668,80 +683,152 @@ func create_order_panel(order: Dictionary, order_number: int = 1) -> PanelContai
 
 
 func create_order_card(order: Dictionary, _order_number: int = 1) -> PanelContainer:
+	var recipe: Recipe = order["recipe"]
+	var is_complex := false
+	var icon_text := "PA"
+	var icon_color := Color(0.46, 0.78, 0.46)
+	for ing in recipe.required_ingredients:
+		var entry := Recipe.normalize_entry(ing)
+		match str(entry["state"]):
+			"decorated_chocolate":
+				is_complex = true
+				icon_text = "CH"
+				icon_color = Color(0.42, 0.24, 0.10)
+			"decorated_strawberry":
+				is_complex = true
+				icon_text = "FR"
+				icon_color = Color(0.88, 0.18, 0.30)
+			"decorated_vanilla":
+				is_complex = true
+				icon_text = "VA"
+				icon_color = Color(0.92, 0.82, 0.42)
+
+	var border_col := Color(0.46, 0.72, 0.42) if not is_complex else Color(0.72, 0.50, 0.22)
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	panel.custom_minimum_size.x = ORDER_PANEL_WIDTH - 24
-	panel.custom_minimum_size.y = 96
+	panel.custom_minimum_size = Vector2(ORDER_PANEL_WIDTH - 24, 0)
 	panel.add_theme_stylebox_override(
 		"panel",
-		UITheme.panel_style(Color(1.0, 0.98, 0.9, 1.0), Color(0.74, 0.58, 0.32), 2, 8, false)
+		UITheme.panel_style(Color(1.0, 0.98, 0.91, 1.0), border_col, 2, 8, false)
 	)
 
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 9)
 	margin.add_theme_constant_override("margin_right", 9)
 	margin.add_theme_constant_override("margin_top", 8)
-	margin.add_theme_constant_override("margin_bottom", 8)
+	margin.add_theme_constant_override("margin_bottom", 6)
 	panel.add_child(margin)
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 5)
+	vbox.add_theme_constant_override("separation", 4)
 	margin.add_child(vbox)
 
+	# ── Fila superior: icono + nombre/puntos + timer ──
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 8)
-	header.custom_minimum_size = Vector2(0, 42)
 	vbox.add_child(header)
 
 	var icon_panel := PanelContainer.new()
-	icon_panel.custom_minimum_size = Vector2(40, 40)
-	icon_panel.add_theme_stylebox_override("panel", UITheme.panel_style(Color(1.0, 0.75, 0.25), Color(0.72, 0.45, 0.12), 2, 8, false))
+	icon_panel.custom_minimum_size = Vector2(42, 42)
+	icon_panel.add_theme_stylebox_override("panel", UITheme.panel_style(icon_color, icon_color.darkened(0.22), 2, 6, false))
 	var icon_label := Label.new()
-	icon_label.text = "PA"
+	icon_label.text = icon_text
 	icon_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	icon_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_style_order_label(icon_label, 18, Color(0.34, 0.18, 0.08))
+	_style_order_label(icon_label, 16, Color.WHITE)
 	icon_panel.add_child(icon_label)
 	header.add_child(icon_panel)
 
+	var name_col := VBoxContainer.new()
+	name_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_col.add_theme_constant_override("separation", 2)
+	header.add_child(name_col)
+
 	var name_label := Label.new()
-	name_label.text = order["recipe"].recipe_name
-	name_label.custom_minimum_size = Vector2(0, 42)
-	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.text = recipe.recipe_name
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_style_order_label(name_label, 18, UITheme.COLOR_INK)
-	header.add_child(name_label)
+	_style_order_label(name_label, 17, UITheme.COLOR_INK)
+	name_col.add_child(name_label)
+
+	var pts_row := HBoxContainer.new()
+	pts_row.add_theme_constant_override("separation", 6)
+	name_col.add_child(pts_row)
+	var pts_label := Label.new()
+	pts_label.text = "%d pts" % recipe.points
+	_style_order_label(pts_label, 13, UITheme.COLOR_MUTED)
+	pts_row.add_child(pts_label)
+	if GameState.selected_level >= 3:
+		var bonus_label := Label.new()
+		bonus_label.text = "+%d rapido" % int(recipe.points * 0.5)
+		_style_order_label(bonus_label, 13, Color(0.12, 0.68, 0.36))
+		pts_row.add_child(bonus_label)
 
 	var time_label := Label.new()
 	time_label.text = format_time(order["time_remaining"])
 	time_label.custom_minimum_size = Vector2(62, 42)
 	time_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_style_order_label(time_label, ORDER_TIME_FONT, UITheme.COLOR_RED)
+	time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_style_order_label(time_label, ORDER_TIME_FONT, UITheme.COLOR_INK)
 	header.add_child(time_label)
 
+	# ── Ingredientes ──
 	var ing_parts: PackedStringArray = []
-	for ing in order["recipe"].required_ingredients:
+	for ing in recipe.required_ingredients:
 		ing_parts.append(_format_ingredient_line(ing))
-
 	if not ing_parts.is_empty():
 		var ing_label := Label.new()
 		ing_label.text = "Necesitas: " + ", ".join(ing_parts)
 		ing_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		ing_label.custom_minimum_size = Vector2(ORDER_PANEL_WIDTH - 52, 34)
-		ing_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		_style_order_label(ing_label, 14, UITheme.COLOR_MUTED)
+		_style_order_label(ing_label, 13, UITheme.COLOR_MUTED)
 		vbox.add_child(ing_label)
 
+	# ── Barra de urgencia ──
+	var bar_track := Control.new()
+	bar_track.custom_minimum_size = Vector2(ORDER_PANEL_WIDTH - 42, 7)
+	bar_track.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_child(bar_track)
+
+	var bar_bg := ColorRect.new()
+	bar_bg.color = Color(0.80, 0.76, 0.70, 0.55)
+	bar_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bar_track.add_child(bar_bg)
+
+	var bar_fill := ColorRect.new()
+	bar_fill.color = Color(0.22, 0.76, 0.38)
+	bar_fill.anchor_left = 0.0
+	bar_fill.anchor_right = 1.0
+	bar_fill.anchor_top = 0.0
+	bar_fill.anchor_bottom = 1.0
+	bar_fill.offset_left = 0
+	bar_fill.offset_right = 0
+	bar_fill.offset_top = 0
+	bar_fill.offset_bottom = 0
+	bar_track.add_child(bar_fill)
+
+	# ── Actualizador periódico ──
 	var timer_updater := Timer.new()
-	timer_updater.wait_time = 0.2
+	timer_updater.wait_time = 0.15
 	timer_updater.timeout.connect(func():
-		if is_instance_valid(time_label):
-			time_label.text = format_time(order["time_remaining"])
-			if order["time_remaining"] < 10.0:
-				_style_order_label(time_label, ORDER_TIME_FONT, UITheme.COLOR_RED)
+		if not is_instance_valid(time_label):
+			return
+		var remaining: float = order["time_remaining"]
+		var prep: float = maxf(recipe.preparation_time, 1.0)
+		var pct: float = clampf(remaining / prep, 0.0, 1.0)
+		time_label.text = format_time(remaining)
+		if remaining < 10.0:
+			_style_order_label(time_label, ORDER_TIME_FONT, UITheme.COLOR_RED)
+		elif pct < 0.35:
+			_style_order_label(time_label, ORDER_TIME_FONT, Color(0.92, 0.58, 0.14))
+		else:
+			_style_order_label(time_label, ORDER_TIME_FONT, UITheme.COLOR_INK)
+		if is_instance_valid(bar_fill):
+			bar_fill.anchor_right = pct
+			if pct < 0.2:
+				bar_fill.color = Color(0.92, 0.16, 0.16)
+			elif pct < 0.45:
+				bar_fill.color = Color(0.92, 0.62, 0.14)
 			else:
-				_style_order_label(time_label, ORDER_TIME_FONT, UITheme.COLOR_INK)
+				bar_fill.color = Color(0.22, 0.76, 0.38)
 	)
 	timer_updater.autostart = true
 	panel.add_child(timer_updater)
