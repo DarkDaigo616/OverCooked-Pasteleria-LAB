@@ -12,10 +12,11 @@ func _ready() -> void:
 		order_manager.order_completed.connect(_on_order_completed)
 		order_manager.order_failed.connect(_on_order_failed)
 		order_manager.all_orders_updated.connect(_on_orders_updated)
-	
+		order_manager.order_penalty_applied.connect(_on_order_penalty)
+
 	if hud:
 		hud.game_ended.connect(_on_game_ended)
-	
+
 	start_game()
 
 func start_game():
@@ -44,6 +45,12 @@ func _on_order_failed(recipe: Recipe):
 	print("❌ Orden fallida: ", recipe.recipe_name)
 	if hud:
 		hud.update_orders(order_manager.get_active_orders())
+
+func _on_order_penalty(penalty: int):
+	print("💔 Penalizacion aplicada: -", penalty, " puntos")
+	if hud:
+		hud.update_score(-penalty)
+		hud.show_delivery_feedback("Orden expirada!  -%d puntos" % penalty, false)
 
 func _on_orders_updated(orders: Array):
 	if hud:

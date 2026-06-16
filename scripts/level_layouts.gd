@@ -1,17 +1,19 @@
 extends RefCounted
 class_name LevelLayouts
 
-## Nivel 1 conserva la introduccion. Nivel 2 abre la cadena completa de receta.
+## Nivel 1: introduccion. Nivel 2: cadena completa. Nivel 3: presion de tiempo con multiples pedidos.
 
 
 static func get_level_count() -> int:
-	return 2
+	return 3
 
 
 static func get_layout(level_id: int) -> Dictionary:
 	match level_id:
 		2:
 			return _recipe_chain_layout()
+		3:
+			return _pressure_layout()
 		_:
 			return _intro_layout()
 
@@ -43,5 +45,27 @@ static func _recipe_chain_layout() -> Dictionary:
 			{"type": "recipe_book", "pos": Vector3(-3.5, 0.5, 7.6)},
 			{"type": "trash", "pos": Vector3(-7.0, 0.5, 7.6)},
 			{"type": "delivery", "pos": Vector3(1.0, 0.5, 7.6), "delivery_time": 1.0},
+		],
+	}
+
+
+static func _pressure_layout() -> Dictionary:
+	return {
+		"name": "Presion de Tiempo",
+		"spawn": Vector3(0.0, 1.0, 6.5),
+		"stations": [
+			# Ingredientes: izquierda
+			{"type": "ingredient", "ingredient": "flour",  "pos": Vector3(-10.5, 0.5, -7.5), "pickup_time": 0.8, "mesh_scale": 0.72},
+			{"type": "ingredient", "ingredient": "egg",    "pos": Vector3(-10.5, 0.5, -2.5), "pickup_time": 0.8, "mesh_scale": 0.78},
+			# Mezcla y horno: centro-norte
+			{"type": "mix",  "pos": Vector3(-4.0, 0.5, -7.5), "mix_time": 3.5},
+			{"type": "cook", "pos": Vector3(2.5,  0.5, -7.5), "cook_time": 5.0, "burn_time": 9.0},
+			# Decoraciones: derecha
+			{"type": "decorate", "decoration": "chocolate",  "pos": Vector3(10.0, 0.5, -5.0), "decoration_time": 2.5},
+			{"type": "decorate", "decoration": "strawberry", "pos": Vector3(10.0, 0.5,  1.0), "decoration_time": 2.5},
+			# Sur: entrega, basura y recetario
+			{"type": "delivery",    "pos": Vector3(0.5,  0.5, 7.5), "delivery_time": 0.8},
+			{"type": "trash",       "pos": Vector3(-5.5, 0.5, 7.5)},
+			{"type": "recipe_book", "pos": Vector3(6.0,  0.5, 7.5)},
 		],
 	}

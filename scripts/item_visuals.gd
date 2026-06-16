@@ -221,6 +221,7 @@ static func _apply_cake_visual(root: Node3D, state: String, mesh_scale: float) -
 	var ruined := state == "ruined_baked"
 	var decorated_vanilla := state == "decorated_vanilla"
 	var decorated_chocolate := state == "decorated_chocolate"
+	var decorated_strawberry := state == "decorated_strawberry"
 
 	var base := CylinderMesh.new()
 	base.top_radius = 0.36
@@ -252,6 +253,8 @@ static func _apply_cake_visual(root: Node3D, state: String, mesh_scale: float) -
 		frosting_color = Color(0.22, 0.1, 0.05)
 	elif decorated_vanilla:
 		frosting_color = Color(1.0, 0.97, 0.84)
+	elif decorated_strawberry:
+		frosting_color = Color(0.95, 0.32, 0.42)
 	_add_mesh(
 		visual,
 		frosting,
@@ -271,14 +274,22 @@ static func _apply_cake_visual(root: Node3D, state: String, mesh_scale: float) -
 		Color(0.28, 0.05, 0.04) if burned else Color(0.9, 0.05, 0.08)
 	)
 
-	if decorated_vanilla or decorated_chocolate:
+	if decorated_vanilla or decorated_chocolate or decorated_strawberry:
 		var sprinkle := BoxMesh.new()
 		sprinkle.size = Vector3(0.12, 0.035, 0.035)
-		var sprinkle_colors := [
-			Color(0.95, 0.36, 0.46),
-			Color(0.35, 0.62, 0.92),
-			Color(0.36, 0.78, 0.42),
-		]
+		var sprinkle_colors: Array[Color]
+		if decorated_strawberry:
+			sprinkle_colors = [
+				Color(0.92, 0.08, 0.14),
+				Color(0.82, 0.04, 0.1),
+				Color(1.0, 0.22, 0.32),
+			]
+		else:
+			sprinkle_colors = [
+				Color(0.95, 0.36, 0.46),
+				Color(0.35, 0.62, 0.92),
+				Color(0.36, 0.78, 0.42),
+			]
 		var positions := [
 			Vector3(-0.16, 0.36, 0.08),
 			Vector3(0.14, 0.36, 0.04),

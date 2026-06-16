@@ -9,6 +9,7 @@ var _progress_bar: ProgressBar3D
 const DECORATION_NAMES := {
 	"vanilla": "Vainilla",
 	"chocolate": "Chocolate",
+	"strawberry": "Fresa",
 }
 
 
@@ -101,7 +102,7 @@ func _validate_cake(item: Node3D) -> Dictionary:
 			return {"success": false, "reason": "El pastel esta quemado."}
 		"ruined_baked":
 			return {"success": false, "reason": "La mezcla salio mal; prepara otro."}
-		"decorated_vanilla", "decorated_chocolate":
+		"decorated_vanilla", "decorated_chocolate", "decorated_strawberry":
 			return {"success": false, "reason": "Ese pastel ya esta decorado."}
 		_:
 			return {"success": false, "reason": "Primero hornea la masa."}
