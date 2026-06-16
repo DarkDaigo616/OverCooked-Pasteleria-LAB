@@ -1,222 +1,140 @@
-# 🍳 Overcooked Style Game - Proyecto Godot
+# Overcooked Style Game - Proyecto Godot
 
-## 📋 Descripción
-Este es un juego estilo Overcooked creado en Godot 4.x donde controlas a un chef que debe completar órdenes de comida antes de que se acabe el tiempo.
+**Version:** 0.4.0
 
-## 🎮 Controles
-- **WASD o Flechas**: Mover al chef
+## Descripcion
+
+Juego de pasteleria estilo Overcooked creado en Godot 4.x. Controlas a un chef que debe completar ordenes de pasteles antes de que se acabe el tiempo, gestionando ingredientes, mezcla, horneado y decoracion.
+
+## Controles
+
+- **Click izquierdo**: Mover al chef / interactuar con estaciones
 - **E o Espacio**: Interactuar con estaciones
-- **Shift**: Correr
 - **Q**: Soltar objeto que llevas en mano
+- **Escape**: Pausar / Menu
 
-## 🎯 Cómo Jugar
+---
 
-### Objetivo
-Completa el máximo número de órdenes posibles en 3 minutos para obtener la mayor puntuación.
+## Niveles
 
-### Mecánicas Básicas
+### Nivel 1 — Introduccion
+Familiarizate con el flujo basico: toma masa pre-mezclada, hornea y entrega.
 
-1. **Recoger Ingredientes**
-   - Ve a las estaciones de ingredientes (Tomate, Lechuga, Carne, Pan)
-   - Presiona E para tomar un ingrediente
+**Receta:** Pastel horneado (100 pts, 60s)
 
-2. **Procesar Ingredientes**
-   - **Cortar**: Coloca ingredientes crudos en la tabla de cortar, mantén E presionado
-   - **Cocinar**: Coloca ingredientes en la estufa y espera (¡cuidado que no se quemen!)
+---
 
-3. **Ensamblar Platos**
-   - Toma un plato de la estación de platos
-   - Llévalo a la mesa de ensamblaje
-   - Agrega los ingredientes según la orden
+### Nivel 2 — Cadena de Receta
+Prepara la receta desde cero: mezcla harina + huevo + azucar, hornea y decora.
 
-4. **Entregar**
-   - Lleva el plato completo a la ventana de entrega
-   - Si coincide con una orden activa, ¡ganas puntos!
+**Receta:** Pastel de vainilla — harina + huevo + azucar → mezcla → horno → decorar (160 pts, 90s)
 
-### Recetas Disponibles
+---
 
-**Hamburguesa Simple** (150 puntos)
-- Pan (crudo)
-- Carne (cocida)
-- Lechuga (cruda)
+### Nivel 3 — Presion de Tiempo  _(Etapa 4)_
+Gestiona hasta **3 pedidos simultaneos** con temporizadores independientes. Decide que orden atender primero: la mas rapida, la mas urgente o la de mayor puntuacion.
 
-**Ensalada Fresca** (100 puntos)
-- Lechuga (cortada)
-- Tomate (cortado)
+**Recetas disponibles:**
 
-**Tomate Asado** (80 puntos)
-- Tomate (cocido)
+| Pedido | Ingredientes | Complejidad | Puntos | Tiempo |
+|--------|-------------|-------------|--------|--------|
+| Pastel simple | harina + huevo → hornear | Sencillo | 80 | 60s |
+| Pastel de chocolate | harina + huevo → hornear → decorar (chocolate) | Medio | 150 | 90s |
+| Pastel con fresa | harina + huevo → hornear → decorar (fresa) | Medio | 150 | 90s |
 
-**Hamburguesa Deluxe** (250 puntos)
-- Pan (crudo)
-- Carne (cocida)
-- Lechuga (cortada)
-- Tomate (cortado)
+**Sistema de puntuacion:**
+- **Bonus de velocidad** (+50%): Si entregas con mas del 50% del tiempo restante
+- **Penalizacion por demora** (-75 pts): Si un pedido expira sin ser entregado
+- La decision de que pedido atender primero es el reto central del nivel
 
-## 🛠️ Instalación
+**Indicadores visuales en el panel de pedidos:**
+- Barra de urgencia: verde → naranja → rojo segun el tiempo restante
+- Badge de complejidad: S (sencillo, verde) / CH / FR (medio, segun tipo)
+- Preview del bonus de velocidad visible en cada tarjeta de pedido
+
+---
+
+## Cadena de preparacion (Niveles 2 y 3)
+
+```
+[Harina] ─┐
+[Huevo]  ─┼→ [Batidora] → [Horno] → [Decorar?] → [Entrega]
+```
+
+---
+
+## Instalacion
 
 ### Requisitos
 - Godot Engine 4.2 o superior
 
 ### Pasos
 
-1. **Descarga e instala Godot**
-   - Ve a https://godotengine.org/download
-   - Descarga Godot 4.2 o superior
-   - Instala o extrae el ejecutable
+1. Descarga e instala Godot desde https://godotengine.org/download
+2. Abre Godot → Importar → selecciona `project.godot`
+3. Presiona F5 para ejecutar
 
-2. **Abre el Proyecto**
-   - Abre Godot
-   - Click en "Importar"
-   - Navega a la carpeta del proyecto
-   - Selecciona el archivo `project.godot`
-   - Click en "Importar y Editar"
+---
 
-3. **Ejecuta el Juego**
-   - Presiona F5 o click en el botón "Play" ▶️
-   - ¡Disfruta!
-
-## 📁 Estructura del Proyecto
+## Estructura del Proyecto
 
 ```
 OvercookedGame/
-├── project.godot          # Configuración del proyecto
-├── scripts/               # Todos los scripts GDScript
-│   ├── chef_player.gd
-│   ├── station_base.gd
-│   ├── ingredient_station.gd
-│   ├── chopping_station.gd
-│   ├── cooking_station.gd
-│   ├── plate_station.gd
-│   ├── assembly_station.gd
-│   ├── delivery_window.gd
-│   ├── recipe.gd
-│   ├── order_manager.gd
-│   ├── game_manager.gd
-│   └── game_hud.gd
-├── scenes/                # Escenas del juego
-│   ├── player/
-│   │   └── chef_player.tscn
-│   ├── stations/
-│   │   └── ingredient_station.tscn
-│   └── levels/
-│       └── kitchen_level.tscn
-└── assets/                # Carpeta para tus assets 3D
-	├── models/
-	├── textures/
-	└── sounds/
+├── project.godot
+├── scripts/
+│   ├── chef_player.gd         # Movimiento e interaccion del chef
+│   ├── game_manager.gd        # Coordinador principal
+│   ├── game_hud.gd            # Interfaz: pedidos, timer, puntos
+│   ├── order_manager.gd       # Pedidos, timers, bonus/penalizacion
+│   ├── recipe.gd              # Definicion de recetas
+│   ├── level_layouts.gd       # Layouts de los 3 niveles
+│   ├── kitchen_level.gd       # Carga y construccion del nivel
+│   ├── station_factory.gd     # Construccion de estaciones
+│   ├── station_base.gd        # Base para todas las estaciones
+│   ├── ingredient_station.gd  # Estacion de ingredientes
+│   ├── mixing_station.gd      # Batidora
+│   ├── cooking_station.gd     # Horno
+│   ├── decoration_station.gd  # Decoracion (vainilla/chocolate/fresa)
+│   ├── delivery_window.gd     # Ventana de entrega
+│   ├── trash_station.gd       # Basura
+│   ├── recipe_book_station.gd # Recetario
+│   ├── item_visuals.gd        # Visuales de ingredientes y pasteles
+│   ├── station_visuals.gd     # Visuales de estaciones
+│   ├── ui_theme.gd            # Tema visual de la UI
+│   ├── game_state.gd          # Estado global (autoload)
+│   └── physics_layers.gd      # Capas de fisica
+├── scenes/
+│   ├── main_menu.tscn
+│   ├── levels/kitchen_level.tscn
+│   └── player/chef_player.tscn
+└── assets/
+	├── ui/                    # Texturas de recetario
+	└── {models,textures,sounds}/
+		├── Tiny_Treats_Bakery_Interior_1.1_FREE/
+		└── KayKit_Restaurant_Bits_1.0_FREE/
 ```
 
-## 🎨 Personalización
+---
 
-### Agregar Assets 3D
+## Historial de Etapas
 
-1. **Modelos del Restaurante (KayKit)**
-   - Descarga: https://kaylousberg.itch.io/restaurant-bits
-   - Extrae los archivos .gltf o .fbx
-   - Cópialos a `assets/models/`
-   - En Godot, arrastra los modelos a las estaciones correspondientes
-
-2. **Modelo del Chef**
-   - Descarga: https://brickle-pickle.itch.io/chef-3d-character
-   - Extrae Chef.fbx
-   - Cópialo a `assets/models/`
-   - En la escena chef_player.tscn, reemplaza el MeshInstance3D con el modelo del chef
-
-### Modificar Parámetros
-
-Puedes ajustar los siguientes valores en el editor:
-
-**En OrderManager:**
-- `max_orders`: Máximo de órdenes simultáneas
-- `order_spawn_interval`: Cada cuántos segundos aparece una nueva orden
-- `base_prep_time`: Tiempo para completar cada orden
-
-**En GameHUD:**
-- `game_time`: Duración total del juego (en segundos)
-
-**En ChefPlayer:**
-- `speed`: Velocidad de movimiento normal
-- `sprint_speed`: Velocidad al correr
-
-**En CookingStation:**
-- `cook_time`: Tiempo para cocinar
-- `burn_time`: Tiempo extra antes de quemarse
-
-**En ChoppingStation:**
-- `chop_duration`: Tiempo para cortar
-
-## 🐛 Solución de Problemas
-
-### El juego no inicia
-- Asegúrate de tener Godot 4.2 o superior
-- Verifica que importaste el proyecto correctamente
-
-### Los ingredientes no se ven
-- Esto es normal en la versión básica
-- Los ingredientes se muestran como esferas de colores
-- Puedes reemplazarlos con los modelos 3D descargados
-
-### Las interacciones no funcionan
-- Asegúrate de estar cerca de la estación
-- Presiona E o Espacio para interactuar
-- Verifica que la estación tenga el grupo "interactable"
-
-### El tiempo no aparece
-- Revisa que la escena kitchen_level.tscn esté configurada como escena principal
-- Ve a Proyecto > Configuración del Proyecto > Application > Run > Main Scene
-
-## 💡 Tips y Trucos
-
-1. **Organización es clave**: Planifica qué ingredientes necesitas antes de empezar
-2. **Usa el sprint**: Shift te permite moverte más rápido entre estaciones
-3. **Atención a los temporizadores**: No dejes comida cocinando sin supervisión
-4. **Prioriza órdenes**: Completa primero las que están por vencer
-5. **Prepara con anticipación**: Puedes cortar ingredientes antes de que llegue la orden
-
-## 🚀 Mejoras Futuras Sugeridas
-
-- [ ] Agregar sonidos y música
-- [ ] Implementar animaciones del chef
-- [ ] Añadir más recetas
-- [ ] Sistema de niveles con dificultad creciente
-- [ ] Modo multijugador local
-- [ ] Power-ups y bonificaciones
-- [ ] Más tipos de estaciones (lavado, horno, parrilla)
-- [ ] Sistema de estrellas según puntuación
-
-## 📝 Créditos
-
-**Assets Utilizados:**
-- KayKit Restaurant Bits por Kay Lousberg
-- Chef Character por Brickle Pickle
-
-**Creado con:**
-- Godot Engine 4.x
-- GDScript
-
-## 📄 Licencia
-
-Este proyecto es educativo y de código abierto. 
-Los assets de terceros mantienen sus licencias originales (CC0 para KayKit).
+| Version | Etapa | Descripcion |
+|---------|-------|-------------|
+| 0.1.0 | Etapa 1 | Movimiento del chef, estaciones basicas, click-to-move |
+| 0.2.0 | Etapa 2 | Assets 3D (Tiny Treats + KayKit), floor procedural, decoraciones |
+| 0.3.0 | Etapa 3 | Cadena de receta completa (mezcla → horno → decoracion), UI mejorada |
+| 0.4.0 | Etapa 4 | Panel de pedidos con timers, puntuacion, bonus/penalizacion, Nivel 3 con 3 recetas simultaneas y decision de prioridad |
 
 ---
 
-## 🎓 Notas para Desarrollo
+## Creditos
 
-Este proyecto fue creado como base educativa. Algunas características están simplificadas:
+**Assets:**
+- Tiny Treats Bakery Interior 1.1 FREE por Quaternius
+- KayKit Restaurant Bits 1.0 FREE por Kay Lousberg
 
-- **Modelos Placeholder**: Se usan formas geométricas básicas en lugar de modelos 3D complejos
-- **Sin Audio**: No hay sonidos ni música implementados
-- **UI Básica**: La interfaz es funcional pero minimalista
-- **Sin Persistencia**: No se guardan puntuaciones ni progreso
-
-**Para mejorar el proyecto:**
-1. Reemplaza los modelos placeholder con los assets descargados
-2. Agrega música de fondo y efectos de sonido
-3. Mejora la UI con sprites personalizados
-4. Implementa un sistema de guardado
+**Motor:** Godot Engine 4.x / GDScript
 
 ---
 
-¡Diviértete cocinando! 👨‍🍳🍔🥗
+Disfruta cocinando bajo presion!

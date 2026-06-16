@@ -1,142 +1,71 @@
 extends RefCounted
 class_name LevelLayouts
 
-## type: ingredient | chop | cook | plate | plating | delivery | trash
+## Nivel 1: introduccion. Nivel 2: cadena completa. Nivel 3: presion de tiempo con multiples pedidos.
+
 
 static func get_level_count() -> int:
-	return 5
+	return 3
 
 
 static func get_layout(level_id: int) -> Dictionary:
-	match clampi(level_id, 1, 5):
-		1:
-			return _layout_classic()
+	match level_id:
 		2:
-			return _layout_mirror()
+			return _recipe_chain_layout()
 		3:
-			return _layout_compact()
-		4:
-			return _layout_cross()
-		5:
-			return _layout_islands()
+			return _pressure_layout()
 		_:
-			return _layout_classic()
+			return _intro_layout()
 
 
-static func _stations_common_ingredients(side_x: float, z_start: float, z_step: float) -> Array:
-	return [
-		{"type": "ingredient", "ingredient": "tomato", "pos": Vector3(side_x, 0.5, z_start)},
-		{"type": "ingredient", "ingredient": "lettuce", "pos": Vector3(side_x, 0.5, z_start + z_step)},
-		{"type": "ingredient", "ingredient": "meat", "pos": Vector3(side_x, 0.5, z_start + z_step * 2)},
-		{"type": "ingredient", "ingredient": "bread", "pos": Vector3(side_x, 0.5, z_start + z_step * 3)},
-	]
-
-
-static func _plating_block(cx: float, cz: float, plate_z: float) -> Array:
-	return [
-		{"type": "plate", "pos": Vector3(cx - 4, 0.5, plate_z)},
-		{"type": "plating", "pos": Vector3(cx, 0.5, cz)},
-		{"type": "delivery", "pos": Vector3(cx + 10, 0.5, cz)},
-		{"type": "trash", "pos": Vector3(cx + 6, 0.5, cz + 5)},
-	]
-
-
-static func _layout_classic() -> Dictionary:
-	var s := _stations_common_ingredients(-11.0, -11.0, 4.5)
-	s.append_array([
-		{"type": "chop", "pos": Vector3(-4, 0.5, -11)},
-		{"type": "chop", "pos": Vector3(-4, 0.5, -5)},
-		{"type": "cook", "pos": Vector3(4, 0.5, -11)},
-		{"type": "cook", "pos": Vector3(4, 0.5, -5)},
-	])
-	s.append_array(_plating_block(0, 2, 9))
+static func _intro_layout() -> Dictionary:
 	return {
-		"name": "Cocina clasica",
-		"spawn": Vector3(6.0, 1.0, 5.0),
-		"stations": s,
+		"name": "Introduccion",
+		"spawn": Vector3(0.0, 1.0, 5.0),
+		"stations": [
+			{"type": "ingredient", "ingredient": "cake_batter", "pos": Vector3(-8, 0.5, 0), "pickup_time": 0.5},
+			{"type": "cook", "pos": Vector3(0, 0.5, -5), "cook_time": 4.0, "burn_time": 999.0},
+			{"type": "delivery", "pos": Vector3(8, 0.5, 0), "delivery_time": 0.5},
+		],
 	}
 
 
-static func _layout_mirror() -> Dictionary:
-	var s := _stations_common_ingredients(11.0, -11.0, 4.5)
-	s.append_array([
-		{"type": "chop", "pos": Vector3(4, 0.5, -11)},
-		{"type": "chop", "pos": Vector3(4, 0.5, -5)},
-		{"type": "cook", "pos": Vector3(-4, 0.5, -11)},
-		{"type": "cook", "pos": Vector3(-4, 0.5, -5)},
-	])
-	s.append_array(_plating_block(0, 2, 9))
+static func _recipe_chain_layout() -> Dictionary:
 	return {
-		"name": "Cocina espejo",
-		"spawn": Vector3(-6.0, 1.0, 5.0),
-		"stations": s,
+		"name": "Cadena de receta",
+		"spawn": Vector3(0.0, 1.0, 8.0),
+		"stations": [
+			{"type": "ingredient", "ingredient": "flour", "pos": Vector3(-10.5, 0.5, -5.4), "pickup_time": 1.0, "mesh_scale": 0.72},
+			{"type": "ingredient", "ingredient": "egg", "pos": Vector3(-10.5, 0.5, -1.2), "pickup_time": 1.0, "mesh_scale": 0.78},
+			{"type": "ingredient", "ingredient": "sugar", "pos": Vector3(-10.5, 0.5, 3.0), "pickup_time": 1.0, "mesh_scale": 0.68},
+			{"type": "mix", "pos": Vector3(-3.5, 0.5, -5.4), "mix_time": 4.0},
+			{"type": "cook", "pos": Vector3(3.5, 0.5, -5.4), "cook_time": 6.0, "burn_time": 5.0},
+			{"type": "decorate", "decoration": "vanilla", "pos": Vector3(10.3, 0.5, -3.0), "decoration_time": 3.0},
+			{"type": "decorate", "decoration": "chocolate", "pos": Vector3(10.3, 0.5, 1.6), "decoration_time": 3.0},
+			{"type": "recipe_book", "pos": Vector3(-3.5, 0.5, 7.6)},
+			{"type": "trash", "pos": Vector3(-7.0, 0.5, 7.6)},
+			{"type": "delivery", "pos": Vector3(1.0, 0.5, 7.6), "delivery_time": 1.0},
+		],
 	}
 
 
-static func _layout_compact() -> Dictionary:
-	var s := [
-		{"type": "ingredient", "ingredient": "tomato", "pos": Vector3(-12, 0.5, -8)},
-		{"type": "ingredient", "ingredient": "lettuce", "pos": Vector3(-12, 0.5, -2)},
-		{"type": "ingredient", "ingredient": "meat", "pos": Vector3(-12, 0.5, 4)},
-		{"type": "ingredient", "ingredient": "bread", "pos": Vector3(-12, 0.5, 10)},
-		{"type": "chop", "pos": Vector3(-5, 0.5, -5)},
-		{"type": "chop", "pos": Vector3(-5, 0.5, 7)},
-		{"type": "cook", "pos": Vector3(5, 0.5, -5)},
-		{"type": "cook", "pos": Vector3(5, 0.5, 7)},
-		{"type": "plate", "pos": Vector3(10, 0.5, 10)},
-		{"type": "plating", "pos": Vector3(10, 0.5, 0)},
-		{"type": "delivery", "pos": Vector3(10, 0.5, -10)},
-		{"type": "trash", "pos": Vector3(6, 0.5, -10)},
-	]
+static func _pressure_layout() -> Dictionary:
 	return {
-		"name": "Cocina compacta",
-		"spawn": Vector3(0.0, 1.0, 0.0),
-		"stations": s,
-	}
-
-
-static func _layout_cross() -> Dictionary:
-	var s := [
-		{"type": "ingredient", "ingredient": "tomato", "pos": Vector3(0, 0.5, -13)},
-		{"type": "ingredient", "ingredient": "lettuce", "pos": Vector3(-13, 0.5, 0)},
-		{"type": "ingredient", "ingredient": "meat", "pos": Vector3(13, 0.5, 0)},
-		{"type": "ingredient", "ingredient": "bread", "pos": Vector3(0, 0.5, 13)},
-		{"type": "chop", "pos": Vector3(-6, 0.5, -6)},
-		{"type": "chop", "pos": Vector3(6, 0.5, -6)},
-		{"type": "cook", "pos": Vector3(-6, 0.5, 6)},
-		{"type": "cook", "pos": Vector3(6, 0.5, 6)},
-		{"type": "plate", "pos": Vector3(-9, 0.5, 9)},
-		{"type": "plating", "pos": Vector3(0, 0.5, 0)},
-		{"type": "delivery", "pos": Vector3(9, 0.5, -9)},
-		{"type": "trash", "pos": Vector3(5, 0.5, -9)},
-	]
-	return {
-		"name": "Cocina en cruz",
-		"spawn": Vector3(0.0, 1.0, 3.0),
-		"stations": s,
-	}
-
-
-static func _layout_islands() -> Dictionary:
-	var s := [
-		{"type": "ingredient", "ingredient": "tomato", "pos": Vector3(-12, 0.5, -9)},
-		{"type": "ingredient", "ingredient": "lettuce", "pos": Vector3(-12, 0.5, -3)},
-		{"type": "ingredient", "ingredient": "meat", "pos": Vector3(12, 0.5, -9)},
-		{"type": "ingredient", "ingredient": "bread", "pos": Vector3(12, 0.5, -3)},
-		{"type": "chop", "pos": Vector3(-6, 0.5, 4)},
-		{"type": "chop", "pos": Vector3(6, 0.5, 4)},
-		{"type": "cook", "pos": Vector3(-6, 0.5, 10)},
-		{"type": "cook", "pos": Vector3(6, 0.5, 10)},
-		{"type": "plate", "pos": Vector3(0, 0.5, -9)},
-		{"type": "plating", "pos": Vector3(0, 0.5, 0)},
-		{"type": "delivery", "pos": Vector3(0, 0.5, 13)},
-		{"type": "trash", "pos": Vector3(4, 0.5, 13)},
-	]
-	return {
-		"name": "Dos islas",
-		"spawn": Vector3(0.0, 1.0, -4.0),
-		"stations": s,
-		"walls": [
-			{"pos": Vector3(0, 1.25, 6.0), "size": Vector3(5.0, 2.5, 0.5)},
+		"name": "Presion de Tiempo",
+		"spawn": Vector3(0.0, 1.0, 6.5),
+		"stations": [
+			# Ingredientes: izquierda
+			{"type": "ingredient", "ingredient": "flour",  "pos": Vector3(-10.5, 0.5, -7.5), "pickup_time": 0.8, "mesh_scale": 0.72},
+			{"type": "ingredient", "ingredient": "egg",    "pos": Vector3(-10.5, 0.5, -2.5), "pickup_time": 0.8, "mesh_scale": 0.78},
+			# Mezcla y horno: centro-norte
+			{"type": "mix",  "pos": Vector3(-4.0, 0.5, -7.5), "mix_time": 3.5},
+			{"type": "cook", "pos": Vector3(2.5,  0.5, -7.5), "cook_time": 5.0, "burn_time": 9.0},
+			# Decoraciones: derecha
+			{"type": "decorate", "decoration": "chocolate",  "pos": Vector3(10.0, 0.5, -5.0), "decoration_time": 2.5},
+			{"type": "decorate", "decoration": "strawberry", "pos": Vector3(10.0, 0.5,  1.0), "decoration_time": 2.5},
+			# Sur: entrega, basura y recetario
+			{"type": "delivery",    "pos": Vector3(0.5,  0.5, 7.5), "delivery_time": 0.8},
+			{"type": "trash",       "pos": Vector3(-5.5, 0.5, 7.5)},
+			{"type": "recipe_book", "pos": Vector3(6.0,  0.5, 7.5)},
 		],
 	}

@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://ciprjvw24s38k" path="res://scripts/main_menu.gd" id="1_menu"]
 
-[node name="MainMenu" type="Control"]
+[node name="MainMenu" type="Control" unique_id=705194923]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -11,62 +11,116 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_menu")
 
-[node name="Background" type="ColorRect" parent="."]
+[node name="Background" type="ColorRect" parent="." unique_id=341854292]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.12, 0.1, 0.14, 1)
+color = Color(0.31, 0.18, 0.11, 1)
 
-[node name="CenterPanel" type="PanelContainer" parent="."]
+[node name="WarmPanel" type="ColorRect" parent="." unique_id=2024045829]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.05
+anchor_top = 0.08
+anchor_right = 0.95
+anchor_bottom = 0.92
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.72, 0.39, 0.18, 1)
+
+[node name="InnerPanel" type="ColorRect" parent="." unique_id=1475805421]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.08
+anchor_top = 0.12
+anchor_right = 0.92
+anchor_bottom = 0.88
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.86, 0.63, 0.35, 1)
+
+[node name="DecorLeft" type="ColorRect" parent="." unique_id=1052348701]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.05
+anchor_top = 0.08
+anchor_right = 0.08
+anchor_bottom = 0.92
+color = Color(0.45, 0.22, 0.1, 1)
+
+[node name="DecorRight" type="ColorRect" parent="." unique_id=202270171]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.92
+anchor_top = 0.08
+anchor_right = 0.95
+anchor_bottom = 0.92
+color = Color(0.45, 0.22, 0.1, 1)
+
+[node name="CenterPanel" type="PanelContainer" parent="." unique_id=1527684378]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -280.0
-offset_top = -320.0
-offset_right = 280.0
-offset_bottom = 320.0
+offset_left = -360.0
+offset_top = -270.0
+offset_right = 360.0
+offset_bottom = 270.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="MarginContainer" type="MarginContainer" parent="CenterPanel"]
+[node name="MarginContainer" type="MarginContainer" parent="CenterPanel" unique_id=1041262436]
 layout_mode = 2
-theme_override_constants/margin_left = 32
-theme_override_constants/margin_top = 32
-theme_override_constants/margin_right = 32
-theme_override_constants/margin_bottom = 32
+theme_override_constants/margin_left = 44
+theme_override_constants/margin_top = 38
+theme_override_constants/margin_right = 44
+theme_override_constants/margin_bottom = 38
 
-[node name="VBoxContainer" type="VBoxContainer" parent="CenterPanel/MarginContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterPanel/MarginContainer" unique_id=2119389980]
 layout_mode = 2
-theme_override_constants/separation = 14
+theme_override_constants/separation = 18
 
-[node name="Title" type="Label" parent="CenterPanel/MarginContainer/VBoxContainer"]
+[node name="Eyebrow" type="Label" parent="CenterPanel/MarginContainer/VBoxContainer" unique_id=571151473]
 layout_mode = 2
-theme_override_font_sizes/font_size = 42
-text = "Overcooked Style"
+theme_override_font_sizes/font_size = 16
+text = "PASTELERIA COOPERATIVA"
 horizontal_alignment = 1
 
-[node name="Subtitle" type="Label" parent="CenterPanel/MarginContainer/VBoxContainer"]
+[node name="Title" type="Label" parent="CenterPanel/MarginContainer/VBoxContainer" unique_id=1603816149]
+layout_mode = 2
+theme_override_font_sizes/font_size = 56
+text = "PASTEL RUSH"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="CenterPanel/MarginContainer/VBoxContainer" unique_id=2087087509]
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
-text = "Elige un nivel"
+text = "Prepara, hornea y entrega pasteles antes de que termine el tiempo"
 horizontal_alignment = 1
+autowrap_mode = 3
 
-[node name="LevelList" type="VBoxContainer" parent="CenterPanel/MarginContainer/VBoxContainer"]
+[node name="SpacerTop" type="Control" parent="CenterPanel/MarginContainer/VBoxContainer" unique_id=1240005821]
+custom_minimum_size = Vector2(0, 12)
+layout_mode = 2
+
+[node name="LevelList" type="VBoxContainer" parent="CenterPanel/MarginContainer/VBoxContainer" unique_id=166530832]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 8
 
-[node name="PlayButton" type="Button" parent="CenterPanel/MarginContainer/VBoxContainer"]
+[node name="PlayButton" type="Button" parent="CenterPanel/MarginContainer/VBoxContainer" unique_id=2130945264]
+custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
-theme_override_font_sizes/font_size = 22
+theme_override_font_sizes/font_size = 24
 text = "Jugar"
 
-[node name="QuitButton" type="Button" parent="CenterPanel/MarginContainer/VBoxContainer"]
+[node name="QuitButton" type="Button" parent="CenterPanel/MarginContainer/VBoxContainer" unique_id=63890763]
+custom_minimum_size = Vector2(0, 46)
 layout_mode = 2
+theme_override_font_sizes/font_size = 18
 text = "Salir"

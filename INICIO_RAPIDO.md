@@ -22,9 +22,8 @@
 
 | Tecla | Acción |
 |-------|--------|
-| **WASD** o **↑↓←→** | Mover |
+| **Click izquierdo** | Mover al punto clickeado |
 | **E** o **Espacio** | Interactuar |
-| **Shift** | Correr |
 | **Q** | Soltar objeto |
 
 ---
@@ -121,7 +120,7 @@
 1. **Lee las órdenes primero** - Planifica antes de empezar
 2. **Cocina con anticipación** - Puedes preparar carne mientras cortas otras cosas
 3. **Cuidado con los tiempos** - No dejes carne cocinando sin supervisión
-4. **Usa Sprint (Shift)** - Ahorra tiempo entre estaciones
+4. **Haz clicks precisos** - Ahorra tiempo entre estaciones
 5. **Prioriza órdenes urgentes** - Las que tienen poco tiempo primero
 
 ---
