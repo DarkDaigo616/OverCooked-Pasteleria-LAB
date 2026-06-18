@@ -27,10 +27,18 @@ signal game_ended(final_score: int)
 
 const HINT_DEFAULT := "Click en una estacion u objeto"
 const DELIVERY_FEEDBACK_DURATION := 3.5
-const RECIPE_BOOK_TEXTURES := {
-	1: "res://assets/ui/recipe_book_level1.png",
-	2: "res://assets/ui/recipe_book_level2.png",
-	3: "res://assets/ui/recipe_book_level2.png",
+const RECIPE_BOOK_DATA := {
+	1: [
+		{"image": "res://assets/ui/pastel_horneado.png", "is_new": false},
+	],
+	2: [
+		{"image": "res://assets/ui/pastel_vainilla.png", "is_new": true},
+	],
+	3: [
+		{"image": "res://assets/ui/pastel_simple.png", "is_new": false},
+		{"image": "res://assets/ui/pastel_chocolate.png", "is_new": true},
+		{"image": "res://assets/ui/pastel_fresa.png", "is_new": true},
+	],
 }
 
 const ORDER_NAME_FONT := 22
@@ -82,7 +90,14 @@ var _game_paused := false
 var _recipe_book_overlay: Control
 var _recipe_book_started_level := false
 var _recipe_book_paused_tree := false
-var _recipe_book_texture: TextureRect
+var _recipe_pages: Array = []
+var _recipe_page_index: int = 0
+var _rb_prev_btn: Button
+var _rb_next_btn: Button
+var _rb_image: TextureRect
+var _rb_new_badge: TextureRect
+var _rb_page_indicator: Label
+var _nueva_receta_overlay: Control
 
 
 func _ready() -> void:
@@ -340,48 +355,142 @@ func _build_recipe_book_overlay() -> void:
 	add_child(_recipe_book_overlay)
 
 	var dim := ColorRect.new()
-	dim.color = Color(0.08, 0.06, 0.04, 0.56)
+	dim.color = Color(0.04, 0.03, 0.02, 0.72)
 	dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_recipe_book_overlay.add_child(dim)
 
+	# Frame sin fondo — solo contiene imagen y controles
 	var frame := Control.new()
 	frame.name = "BookFrame"
 	frame.set_anchors_preset(Control.PRESET_CENTER)
-	frame.offset_left = -610
-	frame.offset_top = -350
-	frame.offset_right = 610
-	frame.offset_bottom = 350
+	frame.offset_left = -580
+	frame.offset_top = -360
+	frame.offset_right = 580
+	frame.offset_bottom = 360
 	_recipe_book_overlay.add_child(frame)
 
-	_recipe_book_texture = TextureRect.new()
-	_recipe_book_texture.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_recipe_book_texture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_recipe_book_texture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	frame.add_child(_recipe_book_texture)
+	var vbox := VBoxContainer.new()
+	vbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	vbox.add_theme_constant_override("separation", 10)
+	frame.add_child(vbox)
+
+	# Contenedor de la imagen: ocupa todo el espacio expandible
+	var img_container := Control.new()
+	img_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	img_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(img_container)
+
+	_rb_image = TextureRect.new()
+	_rb_image.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_rb_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_rb_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	img_container.add_child(_rb_image)
+
+	# Badge "Nueva Receta" en esquina superior derecha
+	_rb_new_badge = TextureRect.new()
+	_rb_new_badge.texture = load("res://assets/ui/nueva_receta.png") as Texture2D
+	_rb_new_badge.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_rb_new_badge.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_rb_new_badge.anchor_left = 1.0
+	_rb_new_badge.anchor_right = 1.0
+	_rb_new_badge.anchor_top = 0.0
+	_rb_new_badge.anchor_bottom = 0.0
+	_rb_new_badge.offset_left = -190
+	_rb_new_badge.offset_top = 0
+	_rb_new_badge.offset_right = 0
+	_rb_new_badge.offset_bottom = 120
+	_rb_new_badge.visible = false
+	img_container.add_child(_rb_new_badge)
+
+	# Botón anterior — solapado sobre el lado izquierdo de la imagen
+	_rb_prev_btn = Button.new()
+	_rb_prev_btn.text = "◀"
+	_rb_prev_btn.anchor_left = 0.0
+	_rb_prev_btn.anchor_right = 0.0
+	_rb_prev_btn.anchor_top = 0.5
+	_rb_prev_btn.anchor_bottom = 0.5
+	_rb_prev_btn.offset_left = 12
+	_rb_prev_btn.offset_right = 82
+	_rb_prev_btn.offset_top = -36
+	_rb_prev_btn.offset_bottom = 36
+	UITheme.apply_button(_rb_prev_btn, UITheme.COLOR_BLUE, Color(0.32, 0.67, 0.9), Color(0.16, 0.44, 0.66))
+	_rb_prev_btn.pressed.connect(func(): _navigate_recipe_page(-1))
+	img_container.add_child(_rb_prev_btn)
+
+	# Botón siguiente — solapado sobre el lado derecho de la imagen
+	_rb_next_btn = Button.new()
+	_rb_next_btn.text = "▶"
+	_rb_next_btn.anchor_left = 1.0
+	_rb_next_btn.anchor_right = 1.0
+	_rb_next_btn.anchor_top = 0.5
+	_rb_next_btn.anchor_bottom = 0.5
+	_rb_next_btn.offset_left = -82
+	_rb_next_btn.offset_right = -12
+	_rb_next_btn.offset_top = -36
+	_rb_next_btn.offset_bottom = 36
+	UITheme.apply_button(_rb_next_btn, UITheme.COLOR_BLUE, Color(0.32, 0.67, 0.9), Color(0.16, 0.44, 0.66))
+	_rb_next_btn.pressed.connect(func(): _navigate_recipe_page(1))
+	img_container.add_child(_rb_next_btn)
+
+	# Fila inferior: indicador de página + botón Jugar
+	var bottom_row := HBoxContainer.new()
+	bottom_row.add_theme_constant_override("separation", 20)
+	bottom_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	bottom_row.custom_minimum_size = Vector2(0, 68)
+	vbox.add_child(bottom_row)
+
+	_rb_page_indicator = Label.new()
+	_rb_page_indicator.custom_minimum_size = Vector2(90, 0)
+	_rb_page_indicator.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_rb_page_indicator.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	UITheme.apply_label(_rb_page_indicator, 22, Color.WHITE, 1)
+	bottom_row.add_child(_rb_page_indicator)
 
 	var close_button := Button.new()
-	close_button.text = ""
+	close_button.text = "Jugar"
 	close_button.icon = UITheme.texture(UITheme.ICON_PLAY)
-	close_button.custom_minimum_size = Vector2(74, 62)
-	close_button.expand_icon = true
-	close_button.add_theme_constant_override("icon_max_width", 34)
-	close_button.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	close_button.offset_left = -37
-	close_button.offset_top = -84
-	close_button.offset_right = 37
-	close_button.offset_bottom = -22
+	close_button.custom_minimum_size = Vector2(180, 60)
+	close_button.add_theme_constant_override("icon_max_width", 26)
 	UITheme.apply_button(close_button, UITheme.COLOR_GREEN, Color(0.2, 0.82, 0.5), Color(0.12, 0.55, 0.3))
 	close_button.pressed.connect(_on_recipe_book_close_pressed)
-	frame.add_child(close_button)
+	bottom_row.add_child(close_button)
+
 	_refresh_recipe_book_content()
 
 
 func _refresh_recipe_book_content() -> void:
 	var level_id := GameState.selected_level
-	if _recipe_book_texture:
-		var texture_path: String = RECIPE_BOOK_TEXTURES.get(level_id, RECIPE_BOOK_TEXTURES[1])
-		_recipe_book_texture.texture = load(texture_path) as Texture2D
+	_recipe_pages = RECIPE_BOOK_DATA.get(level_id, RECIPE_BOOK_DATA[1])
+	_recipe_page_index = 0
+	_update_recipe_book_page()
+
+
+func _update_recipe_book_page() -> void:
+	if _recipe_pages.is_empty():
+		return
+	var page: Dictionary = _recipe_pages[_recipe_page_index]
+	if _rb_image:
+		_rb_image.texture = load(page["image"]) as Texture2D
+	if _rb_new_badge:
+		_rb_new_badge.visible = page.get("is_new", false)
+	var has_multiple := _recipe_pages.size() > 1
+	if _rb_page_indicator:
+		_rb_page_indicator.visible = has_multiple
+		_rb_page_indicator.text = "%d / %d" % [_recipe_page_index + 1, _recipe_pages.size()]
+	if _rb_prev_btn:
+		_rb_prev_btn.visible = has_multiple
+		_rb_prev_btn.disabled = _recipe_page_index == 0
+	if _rb_next_btn:
+		_rb_next_btn.visible = has_multiple
+		_rb_next_btn.disabled = _recipe_page_index >= _recipe_pages.size() - 1
+
+
+func _navigate_recipe_page(delta: int) -> void:
+	_recipe_page_index = clampi(_recipe_page_index + delta, 0, _recipe_pages.size() - 1)
+	_update_recipe_book_page()
+	if _click_player:
+		_click_player.play()
 
 
 func _show_recipe_book_on_level_start() -> void:
@@ -389,6 +498,76 @@ func _show_recipe_book_on_level_start() -> void:
 		return
 	_recipe_book_started_level = true
 	show_recipe_book(true)
+
+
+func _build_nueva_receta_popup() -> void:
+	_nueva_receta_overlay = Control.new()
+	_nueva_receta_overlay.name = "NuevaRecetaOverlay"
+	_nueva_receta_overlay.process_mode = Node.PROCESS_MODE_ALWAYS
+	_nueva_receta_overlay.visible = false
+	_nueva_receta_overlay.z_index = 190
+	_nueva_receta_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	_nueva_receta_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_nueva_receta_overlay)
+
+	var dim := ColorRect.new()
+	dim.color = Color(0.04, 0.05, 0.08, 0.62)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_nueva_receta_overlay.add_child(dim)
+
+	var frame := Control.new()
+	frame.name = "NuevaRecetaFrame"
+	frame.set_anchors_preset(Control.PRESET_CENTER)
+	frame.offset_left = -300
+	frame.offset_top = -200
+	frame.offset_right = 300
+	frame.offset_bottom = 200
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_nueva_receta_overlay.add_child(frame)
+
+	var img := TextureRect.new()
+	img.texture = load("res://assets/ui/nueva_receta.png") as Texture2D
+	img.set_anchors_preset(Control.PRESET_FULL_RECT)
+	img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	img.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	img.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	frame.add_child(img)
+
+	var hint := Label.new()
+	hint.text = "Click para ver el recetario"
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	hint.offset_left = -180
+	hint.offset_right = 180
+	hint.offset_top = -30
+	hint.offset_bottom = 10
+	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	UITheme.apply_label(hint, 16, Color(0.85, 0.85, 0.85))
+	_nueva_receta_overlay.add_child(hint)
+
+	_nueva_receta_overlay.gui_input.connect(func(event: InputEvent):
+		if event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+			if _click_player:
+				_click_player.play()
+			hide_nueva_receta()
+			show_recipe_book(false)
+	)
+
+
+func show_nueva_receta() -> void:
+	if _nueva_receta_overlay == null:
+		return
+	_nueva_receta_overlay.visible = true
+	if not get_tree().paused:
+		_recipe_book_paused_tree = true
+		get_tree().paused = true
+
+
+func hide_nueva_receta() -> void:
+	if _nueva_receta_overlay == null:
+		return
+	_nueva_receta_overlay.visible = false
 
 
 func show_recipe_book(pause_level: bool = true) -> void:
@@ -548,6 +727,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var key_event := event as InputEventKey
 		if key_event.pressed and not key_event.echo and key_event.keycode == KEY_ESCAPE:
+			if _nueva_receta_overlay and _nueva_receta_overlay.visible:
+				hide_nueva_receta()
+				show_recipe_book(false)
+				get_viewport().set_input_as_handled()
+				return
 			if _recipe_book_overlay and _recipe_book_overlay.visible:
 				hide_recipe_book()
 				get_viewport().set_input_as_handled()
