@@ -5,7 +5,7 @@ class_name LevelLayouts
 
 
 static func get_level_count() -> int:
-	return 3
+	return 4
 
 
 static func get_layout(level_id: int) -> Dictionary:
@@ -14,6 +14,8 @@ static func get_layout(level_id: int) -> Dictionary:
 			return _recipe_chain_layout()
 		3:
 			return _pressure_layout()
+		4:
+			return _action_queue_layout()
 		_:
 			return _intro_layout()
 
@@ -45,6 +47,31 @@ static func _recipe_chain_layout() -> Dictionary:
 			{"type": "recipe_book", "pos": Vector3(-3.5, 0.5, 7.6)},
 			{"type": "trash", "pos": Vector3(-7.0, 0.5, 7.6)},
 			{"type": "delivery", "pos": Vector3(1.0, 0.5, 7.6), "delivery_time": 1.0},
+		],
+	}
+
+
+static func _action_queue_layout() -> Dictionary:
+	return {
+		"name": "Cola de Acciones",
+		"spawn": Vector3(0.0, 1.0, 8.0),
+		"queue_mode": true,
+		"stations": [
+			# Ingredientes — izquierda
+			{"type": "ingredient", "ingredient": "flour", "pos": Vector3(-10.0, 0.5, -7.0), "pickup_time": 0.8, "mesh_scale": 0.72},
+			{"type": "ingredient", "ingredient": "egg",   "pos": Vector3(-10.0, 0.5, -1.5), "pickup_time": 0.8, "mesh_scale": 0.78},
+			# Batidora — centro-izquierda
+			{"type": "mix", "pos": Vector3(-3.5, 0.5, -7.0), "mix_time": 3.5},
+			# Dos hornos — centro (crear decision: cual usar)
+			{"type": "cook", "pos": Vector3(3.0, 0.5, -7.0), "cook_time": 5.0, "burn_time": 14.0},
+			{"type": "cook", "pos": Vector3(3.0, 0.5, -1.5), "cook_time": 5.0, "burn_time": 14.0},
+			# Decoraciones — derecha
+			{"type": "decorate", "decoration": "chocolate",  "pos": Vector3(10.0, 0.5, -5.0), "decoration_time": 3.0},
+			{"type": "decorate", "decoration": "strawberry", "pos": Vector3(10.0, 0.5,  1.0), "decoration_time": 3.0},
+			# Sur — entrega, basura, recetario
+			{"type": "delivery",    "pos": Vector3(1.0,  0.5, 7.5), "delivery_time": 0.8},
+			{"type": "trash",       "pos": Vector3(-5.0, 0.5, 7.5)},
+			{"type": "recipe_book", "pos": Vector3(7.0,  0.5, 7.5)},
 		],
 	}
 

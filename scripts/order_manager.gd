@@ -48,6 +48,21 @@ func _process(delta: float) -> void:
 func create_recipes() -> void:
 	available_recipes.clear()
 
+	if GameState.selected_level >= 4:
+		max_orders = 2
+		order_spawn_interval = 30.0
+		available_recipes.append(Recipe.new(
+			"Pastel de chocolate",
+			[{"type": "cake", "state": "decorated_chocolate"}],
+			180, 100.0
+		))
+		available_recipes.append(Recipe.new(
+			"Pastel con fresa",
+			[{"type": "cake", "state": "decorated_strawberry"}],
+			180, 100.0
+		))
+		return
+
 	if GameState.selected_level >= 3:
 		max_orders = 3
 		order_spawn_interval = 25.0

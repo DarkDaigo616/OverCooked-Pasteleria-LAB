@@ -81,6 +81,9 @@ func _ready() -> void:
 	if chef:
 		chef.configure_level_bounds(PLAY_HALF, spawn)
 		chef.configure_navigation_obstacles(_navigation_obstacles)
+		if level_id == 4:
+			chef.queue_mode_enabled = true
+			chef._emit_queue_update()
 	if level_label:
 		level_label.text = "Nivel %d: %s" % [level_id, layout.get("name", "")]
 	if camera:

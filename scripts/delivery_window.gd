@@ -107,6 +107,10 @@ func _finish_delivery() -> void:
 		clear_items()
 		if _progress_bar:
 			_progress_bar.show_complete_check(true)
+			get_tree().create_timer(1.2).timeout.connect(func():
+				if is_instance_valid(_progress_bar):
+					_progress_bar.show_bar(false)
+			)
 	else:
 		order_delivered.emit(false, 0)
 		_show_delivery_message(result.get("reason", "Pedido incorrecto."), false)

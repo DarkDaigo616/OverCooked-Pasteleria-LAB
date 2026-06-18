@@ -39,6 +39,10 @@ const RECIPE_BOOK_DATA := {
 		{"image": "res://assets/ui/pastel_chocolate.png", "is_new": true},
 		{"image": "res://assets/ui/pastel_fresa.png", "is_new": true},
 	],
+	4: [
+		{"image": "res://assets/ui/pastel_chocolate.png", "is_new": false},
+		{"image": "res://assets/ui/pastel_fresa.png", "is_new": false},
+	],
 }
 
 const ORDER_NAME_FONT := 22
@@ -98,6 +102,8 @@ var _rb_image: TextureRect
 var _rb_new_badge: TextureRect
 var _rb_page_indicator: Label
 var _nueva_receta_overlay: Control
+var _queue_panel: PanelContainer
+var _queue_slots: Array = []
 
 
 func _ready() -> void:
@@ -115,6 +121,7 @@ func _ready() -> void:
 		game_over_panel.visible = false
 		_setup_game_over_panel()
 	_build_pause_menu()
+	_build_queue_panel()
 	_build_recipe_book_overlay()
 	if menu_button:
 		menu_button.pressed.connect(_on_menu_pressed)
@@ -498,6 +505,137 @@ func _show_recipe_book_on_level_start() -> void:
 		return
 	_recipe_book_started_level = true
 	show_recipe_book(true)
+
+
+func _build_queue_panel() -> void:
+	_queue_panel = PanelContainer.new()
+	_queue_panel.name = "QueuePanel"
+	_queue_panel.visible = false
+	_queue_panel.z_index = 70
+	_queue_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_queue_panel.offset_left = -310
+	_queue_panel.offset_top = -256
+	_queue_panel.offset_right = 310
+	_queue_panel.offset_bottom = -108
+	_queue_panel.add_theme_stylebox_override(
+		"panel",
+		UITheme.panel_style(Color(0.10, 0.08, 0.06, 0.92), Color(0.72, 0.54, 0.28), 3, 8)
+	)
+	_hud_skin.add_child(_queue_panel)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	_queue_panel.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	margin.add_child(vbox)
+
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 8)
+	vbox.add_child(header)
+
+	var title := Label.new()
+	title.text = "Cola de Acciones"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	UITheme.apply_label(title, 15, UITheme.COLOR_YELLOW, 1)
+	header.add_child(title)
+
+	var hint := Label.new()
+	hint.text = "Click derecho = cancelar"
+	UITheme.apply_label(hint, 12, UITheme.COLOR_MUTED)
+	header.add_child(hint)
+
+	var slots_row := HBoxContainer.new()
+	slots_row.add_theme_constant_override("separation", 6)
+	vbox.add_child(slots_row)
+
+	_queue_slots.clear()
+	for i in range(MAX_QUEUE_SIZE if true else 3):
+		var slot := _make_queue_slot(i + 1)
+		slots_row.add_child(slot)
+		_queue_slots.append(slot)
+
+
+const MAX_QUEUE_SIZE := 3
+
+
+func _make_queue_slot(slot_number: int) -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(184, 46)
+	panel.add_theme_stylebox_override(
+		"panel",
+		UITheme.panel_style(Color(0.20, 0.16, 0.12, 0.95), Color(0.44, 0.34, 0.22), 2, 6, false)
+	)
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_right", 8)
+	margin.add_theme_constant_override("margin_top", 4)
+	margin.add_theme_constant_override("margin_bottom", 4)
+	panel.add_child(margin)
+
+	var hbox := HBoxContainer.new()
+	hbox.add_theme_constant_override("separation", 6)
+	margin.add_child(hbox)
+
+	var num := Label.new()
+	num.text = str(slot_number)
+	num.custom_minimum_size = Vector2(16, 0)
+	num.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.apply_label(num, 13, UITheme.COLOR_MUTED)
+	num.name = "Num"
+	hbox.add_child(num)
+
+	var lbl := Label.new()
+	lbl.text = "—"
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	UITheme.apply_label(lbl, 13, UITheme.COLOR_MUTED)
+	lbl.name = "ActionLabel"
+	hbox.add_child(lbl)
+
+	return panel
+
+
+func update_action_queue(queue: Array, queue_active: bool) -> void:
+	if _queue_panel == null:
+		return
+	_queue_panel.visible = queue_active
+	if not queue_active:
+		return
+
+	for i in range(_queue_slots.size()):
+		var slot := _queue_slots[i] as PanelContainer
+		if slot == null:
+			continue
+		var lbl := slot.find_child("ActionLabel", true, false) as Label
+		if lbl == null:
+			continue
+		if i < queue.size():
+			var action: Dictionary = queue[i]
+			lbl.text = action.get("display_name", "?")
+			if i == 0:
+				UITheme.apply_label(lbl, 13, Color(1.0, 0.88, 0.35))
+				slot.add_theme_stylebox_override(
+					"panel",
+					UITheme.panel_style(Color(0.30, 0.22, 0.08, 0.95), Color(0.82, 0.62, 0.16), 2, 6, false)
+				)
+			else:
+				UITheme.apply_label(lbl, 13, UITheme.COLOR_CREAM)
+				slot.add_theme_stylebox_override(
+					"panel",
+					UITheme.panel_style(Color(0.20, 0.16, 0.12, 0.95), Color(0.44, 0.34, 0.22), 2, 6, false)
+				)
+		else:
+			lbl.text = "—"
+			UITheme.apply_label(lbl, 13, UITheme.COLOR_MUTED)
+			slot.add_theme_stylebox_override(
+				"panel",
+				UITheme.panel_style(Color(0.20, 0.16, 0.12, 0.95), Color(0.44, 0.34, 0.22), 2, 6, false)
+			)
 
 
 func _build_nueva_receta_popup() -> void:
