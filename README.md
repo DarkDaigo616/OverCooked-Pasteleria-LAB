@@ -1,6 +1,6 @@
 # Overcooked Style Game - Proyecto Godot
 
-**Version:** 0.4.0
+**Version:** 0.5.0
 
 ## Descripcion
 
@@ -9,6 +9,8 @@ Juego de pasteleria estilo Overcooked creado en Godot 4.x. Controlas a un chef q
 ## Controles
 
 - **Click izquierdo**: Mover al chef / interactuar con estaciones
+- **Shift + Click izquierdo**: Añadir accion a la cola (Nivel 4)
+- **Click derecho**: Cancelar cola de acciones (Nivel 4)
 - **E o Espacio**: Interactuar con estaciones
 - **Q**: Soltar objeto que llevas en mano
 - **Escape**: Pausar / Menu
@@ -47,14 +49,27 @@ Gestiona hasta **3 pedidos simultaneos** con temporizadores independientes. Deci
 - **Penalizacion por demora** (-75 pts): Si un pedido expira sin ser entregado
 - La decision de que pedido atender primero es el reto central del nivel
 
-**Indicadores visuales en el panel de pedidos:**
-- Barra de urgencia: verde → naranja → rojo segun el tiempo restante
-- Badge de complejidad: S (sencillo, verde) / CH / FR (medio, segun tipo)
-- Preview del bonus de velocidad visible en cada tarjeta de pedido
+---
+
+### Nivel 4 — Cola de Acciones  _(Etapa 5)_
+Planea hasta **3 acciones consecutivas** con Shift+click. El chef las ejecuta en orden, esperando automaticamente si una estacion esta ocupada.
+
+**Recetas disponibles:**
+
+| Pedido | Ingredientes | Puntos | Tiempo |
+|--------|-------------|--------|--------|
+| Pastel de chocolate | harina + huevo → mezcla → horno → decorar (chocolate) | 100 | 180s |
+| Pastel con fresa | harina + huevo → mezcla → horno → decorar (fresa) | 100 | 180s |
+
+**Reglas de la cola:**
+- **Shift + Click** en una estacion: encola la accion
+- **Click derecho**: cancela toda la cola (penalizacion de 2s)
+- No se puede encolar la misma estacion dos veces
+- Click izquierdo normal: movimiento libre sin afectar la cola
 
 ---
 
-## Cadena de preparacion (Niveles 2 y 3)
+## Cadena de preparacion (Niveles 2, 3 y 4)
 
 ```
 [Harina] ─┐
@@ -84,10 +99,10 @@ OvercookedGame/
 ├── scripts/
 │   ├── chef_player.gd         # Movimiento e interaccion del chef
 │   ├── game_manager.gd        # Coordinador principal
-│   ├── game_hud.gd            # Interfaz: pedidos, timer, puntos
+│   ├── game_hud.gd            # Interfaz: pedidos, timer, puntos, cola
 │   ├── order_manager.gd       # Pedidos, timers, bonus/penalizacion
 │   ├── recipe.gd              # Definicion de recetas
-│   ├── level_layouts.gd       # Layouts de los 3 niveles
+│   ├── level_layouts.gd       # Layouts de los 4 niveles
 │   ├── kitchen_level.gd       # Carga y construccion del nivel
 │   ├── station_factory.gd     # Construccion de estaciones
 │   ├── station_base.gd        # Base para todas las estaciones
@@ -108,10 +123,10 @@ OvercookedGame/
 │   ├── levels/kitchen_level.tscn
 │   └── player/chef_player.tscn
 └── assets/
-	├── ui/                    # Texturas de recetario
-	└── {models,textures,sounds}/
-		├── Tiny_Treats_Bakery_Interior_1.1_FREE/
-		└── KayKit_Restaurant_Bits_1.0_FREE/
+    ├── ui/                    # Texturas de recetario
+    └── {models,textures,sounds}/
+        ├── Tiny_Treats_Bakery_Interior_1.1_FREE/
+        └── KayKit_Restaurant_Bits_1.0_FREE/
 ```
 
 ---
@@ -123,7 +138,8 @@ OvercookedGame/
 | 0.1.0 | Etapa 1 | Movimiento del chef, estaciones basicas, click-to-move |
 | 0.2.0 | Etapa 2 | Assets 3D (Tiny Treats + KayKit), floor procedural, decoraciones |
 | 0.3.0 | Etapa 3 | Cadena de receta completa (mezcla → horno → decoracion), UI mejorada |
-| 0.4.0 | Etapa 4 | Panel de pedidos con timers, puntuacion, bonus/penalizacion, Nivel 3 con 3 recetas simultaneas y decision de prioridad |
+| 0.4.0 | Etapa 4 | Panel de pedidos con timers, puntuacion, bonus/penalizacion, Nivel 3 con 3 recetas simultaneas |
+| 0.5.0 | Etapa 5 | Cola de acciones (Nivel 4): planear hasta 3 acciones con Shift+click, espera automatica en estaciones ocupadas |
 
 ---
 
