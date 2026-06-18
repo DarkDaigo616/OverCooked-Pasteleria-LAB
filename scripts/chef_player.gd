@@ -17,8 +17,14 @@ const HELD_BASE_SCALE_META := "_held_base_scale"
 @export var navigation_clearance: float = 0.65
 @export var held_item_scale_multiplier: float = 1.85
 
+const MAX_QUEUE_SIZE := 3
+const PLAN_CHANGE_PENALTY_SECONDS := 2.0
+
 var held_item: Node3D = null
 var movement_enabled: bool = true
+var queue_mode_enabled: bool = false
+var _action_queue: Array = []
+var _queue_penalty_remaining: float = 0.0
 var _interactables_in_range: Array[Node3D] = []
 var _level_bounds_half: float = 15.0
 var _spawn_position: Vector3 = Vector3.ZERO
@@ -30,6 +36,8 @@ var _has_move_target: bool = false
 var _path_points: Array[Vector3] = []
 var _path_index: int = 0
 var _navigation_obstacles: Array[Rect2] = []
+
+signal action_queue_changed(queue: Array)
 
 @onready var model = $Model
 @onready var hand_position: Node3D = $Model/HandPosition
@@ -115,6 +123,14 @@ func _physics_process(delta: float) -> void:
 	if not movement_enabled:
 		velocity = Vector3.ZERO
 		return
+	if _queue_penalty_remaining > 0.0:
+		_queue_penalty_remaining -= delta
+		velocity.x = move_toward(velocity.x, 0, friction * delta)
+		velocity.z = move_toward(velocity.z, 0, friction * delta)
+		_refresh_hover_target()
+		move_and_slide()
+		_enforce_safe_position()
+		return
 	_refresh_hover_target()
 	_refresh_nearby_interactables()
 	_process_pending_interaction()
@@ -134,10 +150,18 @@ func _input(event: InputEvent) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not movement_enabled:
 		return
+	if queue_mode_enabled and _queue_penalty_remaining > 0.0:
+		return
 	if event is InputEventMouseButton:
 		var mouse_event := event as InputEventMouseButton
 		if mouse_event.button_index == MOUSE_BUTTON_LEFT and mouse_event.pressed:
-			_handle_left_click(mouse_event.position)
+			if queue_mode_enabled and mouse_event.shift_pressed:
+				_handle_queue_click(mouse_event.position)
+			else:
+				_handle_left_click(mouse_event.position)
+		elif mouse_event.button_index == MOUSE_BUTTON_RIGHT and mouse_event.pressed:
+			if queue_mode_enabled:
+				cancel_action_queue()
 
 
 func _handle_left_click(screen_position: Vector2) -> void:
@@ -554,8 +578,16 @@ func attempt_interaction() -> void:
 func _process_pending_interaction() -> void:
 	if _pending_interaction_target == null or not is_instance_valid(_pending_interaction_target):
 		_pending_interaction_target = null
+		if queue_mode_enabled:
+			_complete_queue_action()
 		return
 	if global_position.distance_to(_interaction_position_for(_pending_interaction_target)) > interact_range:
+		return
+
+	# En modo cola: esperar si la estacion esta procesando activamente
+	if queue_mode_enabled and _pending_interaction_target.get("is_processing") == true:
+		_has_move_target = false
+		velocity = Vector3.ZERO
 		return
 
 	_has_move_target = false
@@ -570,6 +602,9 @@ func _process_pending_interaction() -> void:
 			interacted_with_station.emit(target)
 			_flash_hud_interaction()
 	_pending_interaction_target = null
+
+	if queue_mode_enabled:
+		_complete_queue_action()
 
 
 func _interaction_position_for(target: Node3D) -> Vector3:
@@ -725,3 +760,85 @@ func get_held_item() -> Node3D:
 
 func has_item() -> bool:
 	return held_item != null
+
+
+# ── Cola de acciones ──────────────────────────────────────────────────────────
+
+func _handle_queue_click(screen_position: Vector2) -> void:
+	if _hover_target and is_instance_valid(_hover_target):
+		_enqueue_action(_hover_target)
+		return
+	# Click en espacio vacío: movimiento libre sin encolar
+	_set_click_move_target(screen_position)
+
+
+func _enqueue_action(target: Node3D) -> void:
+	if _action_queue.size() >= MAX_QUEUE_SIZE:
+		_show_hud_message("Cola llena — max %d acciones" % MAX_QUEUE_SIZE, false)
+		return
+	if _pending_interaction_target == target:
+		_show_hud_message("Ya en progreso", false)
+		return
+	for action in _action_queue:
+		if action.get("target") == target:
+			_show_hud_message("Ya esta en la cola", false)
+			return
+	_action_queue.append({
+		"target": target,
+		"display_name": _get_target_display_name(target),
+	})
+	_emit_queue_update()
+	if _pending_interaction_target == null:
+		_start_next_queued_action()
+
+
+func cancel_action_queue() -> void:
+	if _action_queue.is_empty() and _pending_interaction_target == null:
+		return
+	var had_active := _pending_interaction_target != null
+	_action_queue.clear()
+	_pending_interaction_target = null
+	_has_move_target = false
+	if had_active:
+		_queue_penalty_remaining = PLAN_CHANGE_PENALTY_SECONDS
+		_show_hud_message("Plan cancelado — %ds de penalizacion" % int(PLAN_CHANGE_PENALTY_SECONDS), false)
+	_emit_queue_update()
+
+
+func _start_next_queued_action() -> void:
+	while not _action_queue.is_empty():
+		var action: Dictionary = _action_queue[0]
+		var target: Node3D = action.get("target")
+		if is_instance_valid(target):
+			_pending_interaction_target = target
+			_set_navigation_target(_interaction_position_for(target))
+			return
+		# Objetivo invalido: saltar y continuar
+		_action_queue.pop_front()
+	_emit_queue_update()
+
+
+func _complete_queue_action() -> void:
+	if not _action_queue.is_empty():
+		_action_queue.pop_front()
+	_emit_queue_update()
+	_start_next_queued_action()
+
+
+func _emit_queue_update() -> void:
+	action_queue_changed.emit(_action_queue)
+	var hud := _get_hud()
+	if hud and hud.has_method("update_action_queue"):
+		hud.update_action_queue(_action_queue, queue_mode_enabled)
+
+
+func _get_target_display_name(target: Node3D) -> String:
+	if target.has_method("get_display_name"):
+		return target.get_display_name()
+	return _get_item_display_name(target)
+
+
+func _show_hud_message(text: String, success: bool) -> void:
+	var hud := _get_hud()
+	if hud:
+		hud.show_delivery_feedback(text, success)
