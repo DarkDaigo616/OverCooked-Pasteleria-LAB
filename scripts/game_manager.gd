@@ -70,6 +70,3 @@ func _on_game_ended(final_score: int) -> void:
 	print("Puntuacion final: ", final_score)
 
 
-func _input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_cancel"):
-		GameState.go_to_menu()

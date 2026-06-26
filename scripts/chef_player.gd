@@ -20,6 +20,10 @@ const HELD_BASE_SCALE_META := "_held_base_scale"
 const MAX_QUEUE_SIZE := 3
 const PLAN_CHANGE_PENALTY_SECONDS := 2.0
 
+var player_id: int = 1
+var player_color: Color = Color(1.0, 0.55, 0.65)
+var show_player_indicator: bool = false
+var is_active_player: bool = true
 var held_item: Node3D = null
 var movement_enabled: bool = true
 var queue_mode_enabled: bool = false
@@ -50,6 +54,7 @@ signal interacted_with_station(station)
 
 func _ready() -> void:
 	add_to_group("player")
+	add_to_group("player_%d" % player_id)
 	collision_layer = PhysicsLayers.PLAYER
 	collision_mask = PhysicsLayers.MASK_PLAYER
 
@@ -101,6 +106,8 @@ func _setup_chef_model() -> void:
 		model.add_child(hand_position)
 
 	hand_position.position = Vector3(0.55, 1.08, 0.42)
+	if show_player_indicator:
+		_add_player_color_ring()
 
 
 func configure_level_bounds(half_size: float, spawn: Vector3) -> void:
@@ -150,6 +157,8 @@ func _input(event: InputEvent) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not movement_enabled:
 		return
+	if not is_active_player:
+		return
 	if queue_mode_enabled and _queue_penalty_remaining > 0.0:
 		return
 	if event is InputEventMouseButton:
@@ -167,7 +176,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _handle_left_click(screen_position: Vector2) -> void:
 	if _hover_target and is_instance_valid(_hover_target):
 		_pending_interaction_target = _hover_target
-		_set_navigation_target(_interaction_position_for(_pending_interaction_target))
+		_set_navigation_target(_navigation_position_for(_pending_interaction_target))
 		return
 
 	_pending_interaction_target = null
@@ -211,6 +220,11 @@ func _set_navigation_target(target: Vector3) -> void:
 
 
 func _refresh_hover_target() -> void:
+	if not is_active_player:
+		if _hover_target:
+			_update_station_highlights(null)
+			_hover_target = null
+		return
 	var target := _get_mouse_hover_target()
 	_hover_target = target
 	_update_station_highlights(_hover_target)
@@ -613,6 +627,25 @@ func _interaction_position_for(target: Node3D) -> Vector3:
 	return target_position
 
 
+func _navigation_position_for(target: Node3D) -> Vector3:
+	# Dropped items are on the floor — navigate to their exact position.
+	if target.is_in_group("dropped_item"):
+		var p := target.global_position
+		p.y = floor_y
+		return p
+	# Stations: approach from the player's current side so the straight-line
+	# path never enters the station's grown obstacle rect (±1.775 from center).
+	# 2.5 units stays safely outside the grown rect at all approach angles
+	# while still being within interact_range (2.8).
+	const APPROACH_DIST := 2.5
+	var sc := target.global_position
+	var dir := Vector3(global_position.x - sc.x, 0.0, global_position.z - sc.z)
+	if dir.length_squared() > 0.01:
+		dir = dir.normalized()
+		return Vector3(sc.x + dir.x * APPROACH_DIST, floor_y, sc.z + dir.z * APPROACH_DIST)
+	return Vector3(sc.x, floor_y, sc.z)
+
+
 func _flash_hud_interaction() -> void:
 	var hud := _get_hud()
 	if hud:
@@ -754,6 +787,46 @@ func _set_item_physics_enabled_recursive(node: Node, enabled: bool) -> void:
 		_set_item_physics_enabled_recursive(child, enabled)
 
 
+func _add_player_color_ring() -> void:
+	if not model:
+		return
+	var existing := model.find_child("PlayerColorRing", false, false)
+	if existing:
+		existing.queue_free()
+	var ring := MeshInstance3D.new()
+	ring.name = "PlayerColorRing"
+	var mesh := CylinderMesh.new()
+	mesh.top_radius = 0.24
+	mesh.bottom_radius = 0.24
+	mesh.height = 0.055
+	mesh.rings = 1
+	mesh.radial_segments = 16
+	ring.mesh = mesh
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = player_color
+	mat.emission_enabled = true
+	mat.emission = player_color * 0.4
+	ring.material_override = mat
+	ring.position = Vector3(0, 1.55, 0)
+	model.add_child(ring)
+
+	var existing_lbl := model.find_child("PlayerLabel", false, false)
+	if existing_lbl:
+		existing_lbl.queue_free()
+	var lbl := Label3D.new()
+	lbl.name = "PlayerLabel"
+	lbl.text = "P%d" % player_id
+	lbl.font_size = 28
+	lbl.modulate = player_color
+	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	lbl.no_depth_test = true
+	lbl.render_priority = 6
+	lbl.position = Vector3(0, 2.1, 0)
+	lbl.outline_size = 6
+	lbl.outline_modulate = Color(0.05, 0.05, 0.05, 0.9)
+	model.add_child(lbl)
+
+
 func get_held_item() -> Node3D:
 	return held_item
 
@@ -811,7 +884,7 @@ func _start_next_queued_action() -> void:
 		var target: Node3D = action.get("target")
 		if is_instance_valid(target):
 			_pending_interaction_target = target
-			_set_navigation_target(_interaction_position_for(target))
+			_set_navigation_target(_navigation_position_for(target))
 			return
 		# Objetivo invalido: saltar y continuar
 		_action_queue.pop_front()
@@ -829,7 +902,7 @@ func _emit_queue_update() -> void:
 	action_queue_changed.emit(_action_queue)
 	var hud := _get_hud()
 	if hud and hud.has_method("update_action_queue"):
-		hud.update_action_queue(_action_queue, queue_mode_enabled)
+		hud.update_action_queue(_action_queue, queue_mode_enabled, player_id)
 
 
 func _get_target_display_name(target: Node3D) -> String:

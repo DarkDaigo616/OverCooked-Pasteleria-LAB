@@ -31,7 +31,7 @@ func interact(player: ChefPlayer) -> void:
 	if held and current_items.is_empty():
 		var validation := _validate_cake(held)
 		if not validation["success"]:
-			_show_station_message(validation["reason"], false)
+			_show_station_message(validation["reason"], validation.get("already_done", false))
 			return
 
 		var item := player.take_item_from_hand()
@@ -103,7 +103,7 @@ func _validate_cake(item: Node3D) -> Dictionary:
 		"ruined_baked":
 			return {"success": false, "reason": "La mezcla salio mal; prepara otro."}
 		"decorated_vanilla", "decorated_chocolate", "decorated_strawberry":
-			return {"success": false, "reason": "Ese pastel ya esta decorado."}
+			return {"success": false, "reason": "Ya decorado — llevatelo a la entrega.", "already_done": true}
 		_:
 			return {"success": false, "reason": "Primero hornea la masa."}
 

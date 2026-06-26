@@ -1,6 +1,8 @@
 extends Station
 class_name CookingStation
 
+signal item_burned
+
 @export var cook_time: float = 5.0
 @export var burn_time: float = 999.0
 @export var auto_cook: bool = true
@@ -62,6 +64,7 @@ func _process(delta: float) -> void:
 		item.set_meta(COOKING_PROGRESS_META, cook_time + burn_time)
 		is_burned = true
 		is_cooking = false
+		item_burned.emit()
 		if item.has_meta("ingredient_type"):
 			var burn_scale := 0.95 if item.get_meta("ingredient_type", "") == "cake" else 0.45
 			ItemVisuals.apply_ingredient_visual(item, item.get_meta("ingredient_type"), "burned", burn_scale)
