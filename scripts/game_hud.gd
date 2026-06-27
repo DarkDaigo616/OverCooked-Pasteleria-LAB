@@ -43,6 +43,16 @@ const RECIPE_BOOK_DATA := {
 		{"image": "res://assets/ui/pastel_chocolate.png", "is_new": false},
 		{"image": "res://assets/ui/pastel_fresa.png", "is_new": false},
 	],
+	5: [
+		{"image": "res://assets/ui/pastel_simple.png", "is_new": false},
+		{"image": "res://assets/ui/pastel_chocolate.png", "is_new": false},
+		{"image": "res://assets/ui/pastel_fresa.png", "is_new": false},
+	],
+	6: [
+		{"image": "res://assets/ui/pastel_vainilla.png", "is_new": false},
+		{"image": "res://assets/ui/pastel_chocolate.png", "is_new": false},
+		{"image": "res://assets/ui/pastel_fresa.png", "is_new": false},
+	],
 }
 
 const ORDER_NAME_FONT := 22
@@ -104,6 +114,27 @@ var _rb_page_indicator: Label
 var _nueva_receta_overlay: Control
 var _queue_panel: PanelContainer
 var _queue_slots: Array = []
+var _queue_panel_p2: PanelContainer
+var _queue_slots_p2: Array = []
+var _coop_selector: Control = null
+var _p1_btn: PanelContainer = null
+var _p2_btn: PanelContainer = null
+var _coop_active: bool = false
+var _star_thresholds: Array = []
+var _no_burn_for_3_stars: bool = false
+var _orders_delivered_count: int = 0
+var _delivery_pts_total: int = 0
+var _orders_failed_count: int = 0
+var _penalty_total: int = 0
+var _cakes_burned_count: int = 0
+var _is_real_game: bool = false
+var _star_icons: Array = []
+var _threshold_labels: Array = []
+var _delivery_counter_pill: PanelContainer = null
+var _delivery_counter_lbl: Label = null
+var _no_burn_lbl: Label = null
+var _end_deliveries_lbl: Label = null
+var _retry_button: Button = null
 
 
 func _ready() -> void:
@@ -122,7 +153,10 @@ func _ready() -> void:
 		_setup_game_over_panel()
 	_build_pause_menu()
 	_build_queue_panel()
+	_build_queue_panel_p2()
+	_build_coop_selector()
 	_build_recipe_book_overlay()
+	_build_delivery_counter()
 	if menu_button:
 		menu_button.pressed.connect(_on_menu_pressed)
 	call_deferred("_sync_orders_from_manager")
@@ -281,8 +315,65 @@ func _setup_game_over_panel() -> void:
 	var title := game_over_panel.find_child("Title", true, false) as Label
 	if title:
 		UITheme.apply_label(title, 42, UITheme.COLOR_INK, 1)
+
+	var vbox := game_over_panel.find_child("VBoxContainer", true, false) as VBoxContainer
+	if vbox:
+		vbox.add_theme_constant_override("separation", 12)
+
+		# Star row: each star is a column (icon + threshold label underneath)
+		var star_row := HBoxContainer.new()
+		star_row.name = "StarRow"
+		star_row.alignment = BoxContainer.ALIGNMENT_CENTER
+		star_row.add_theme_constant_override("separation", 36)
+		star_row.visible = false
+		for _i in range(3):
+			var col := VBoxContainer.new()
+			col.alignment = BoxContainer.ALIGNMENT_CENTER
+			col.add_theme_constant_override("separation", 2)
+			var star_icon := UITheme.icon(UITheme.ICON_STAR, Vector2(60, 60))
+			star_icon.modulate = Color(0.35, 0.35, 0.35, 0.35)
+			col.add_child(star_icon)
+			_star_icons.append(star_icon)
+			var thresh_lbl := Label.new()
+			thresh_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			thresh_lbl.text = "?"
+			UITheme.apply_label(thresh_lbl, 15, UITheme.COLOR_MUTED)
+			col.add_child(thresh_lbl)
+			_threshold_labels.append(thresh_lbl)
+			star_row.add_child(col)
+		vbox.add_child(star_row)
+		vbox.move_child(star_row, 1)
+
+		_end_deliveries_lbl = Label.new()
+		_end_deliveries_lbl.name = "DeliveriesLabel"
+		_end_deliveries_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_end_deliveries_lbl.visible = false
+		UITheme.apply_label(_end_deliveries_lbl, 18, UITheme.COLOR_MUTED)
+		vbox.add_child(_end_deliveries_lbl)
+		vbox.move_child(_end_deliveries_lbl, 2)
+
+		_no_burn_lbl = Label.new()
+		_no_burn_lbl.name = "NoBurnLabel"
+		_no_burn_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_no_burn_lbl.visible = false
+		UITheme.apply_label(_no_burn_lbl, 16, UITheme.COLOR_GREEN)
+		vbox.add_child(_no_burn_lbl)
+		vbox.move_child(_no_burn_lbl, 3)
+
 	if final_score_label:
 		UITheme.apply_label(final_score_label, 28, UITheme.COLOR_MUTED)
+
+	_retry_button = Button.new()
+	_retry_button.name = "RetryButton"
+	_retry_button.text = "Reintentar"
+	_retry_button.custom_minimum_size = Vector2(0, 58)
+	_retry_button.visible = false
+	UITheme.apply_button(_retry_button, UITheme.COLOR_YELLOW, Color(1.0, 0.84, 0.35), Color(0.86, 0.56, 0.1), UITheme.COLOR_INK)
+	_retry_button.pressed.connect(_on_retry_pressed)
+	if vbox:
+		vbox.add_child(_retry_button)
+		vbox.move_child(_retry_button, vbox.get_child_count() - 2)
+
 	if menu_button:
 		menu_button.custom_minimum_size = Vector2(0, 58)
 		menu_button.icon = UITheme.texture(UITheme.ICON_PLAY)
@@ -539,14 +630,15 @@ func _build_queue_panel() -> void:
 	vbox.add_child(header)
 
 	var title := Label.new()
+	title.name = "Title"
 	title.text = "Cola de Acciones"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	UITheme.apply_label(title, 15, UITheme.COLOR_YELLOW, 1)
+	UITheme.apply_label(title, 12, UITheme.COLOR_YELLOW, 1)
 	header.add_child(title)
 
 	var hint := Label.new()
 	hint.text = "Click derecho = cancelar"
-	UITheme.apply_label(hint, 12, UITheme.COLOR_MUTED)
+	UITheme.apply_label(hint, 10, UITheme.COLOR_MUTED)
 	header.add_child(hint)
 
 	var slots_row := HBoxContainer.new()
@@ -583,9 +675,9 @@ func _make_queue_slot(slot_number: int) -> PanelContainer:
 
 	var num := Label.new()
 	num.text = str(slot_number)
-	num.custom_minimum_size = Vector2(16, 0)
+	num.custom_minimum_size = Vector2(14, 0)
 	num.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	UITheme.apply_label(num, 13, UITheme.COLOR_MUTED)
+	UITheme.apply_label(num, 11, UITheme.COLOR_MUTED)
 	num.name = "Num"
 	hbox.add_child(num)
 
@@ -593,22 +685,28 @@ func _make_queue_slot(slot_number: int) -> PanelContainer:
 	lbl.text = "—"
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	UITheme.apply_label(lbl, 13, UITheme.COLOR_MUTED)
+	UITheme.apply_label(lbl, 11, UITheme.COLOR_MUTED)
 	lbl.name = "ActionLabel"
 	hbox.add_child(lbl)
 
 	return panel
 
 
-func update_action_queue(queue: Array, queue_active: bool) -> void:
-	if _queue_panel == null:
-		return
-	_queue_panel.visible = queue_active
-	if not queue_active:
-		return
+func update_action_queue(queue: Array, queue_active: bool, player_id: int = 1) -> void:
+	if player_id == 2:
+		_update_queue_display(_queue_panel_p2, _queue_slots_p2, queue, queue_active, Color(0.28, 0.60, 1.0))
+	else:
+		_update_queue_display(_queue_panel, _queue_slots, queue, queue_active, Color(1.0, 0.42, 0.58))
 
-	for i in range(_queue_slots.size()):
-		var slot := _queue_slots[i] as PanelContainer
+
+func _update_queue_display(panel: PanelContainer, slots: Array, queue: Array, active: bool, accent: Color) -> void:
+	if panel == null:
+		return
+	panel.visible = active
+	if not active:
+		return
+	for i in range(slots.size()):
+		var slot := slots[i] as PanelContainer
 		if slot == null:
 			continue
 		var lbl := slot.find_child("ActionLabel", true, false) as Label
@@ -618,24 +716,162 @@ func update_action_queue(queue: Array, queue_active: bool) -> void:
 			var action: Dictionary = queue[i]
 			lbl.text = action.get("display_name", "?")
 			if i == 0:
-				UITheme.apply_label(lbl, 13, Color(1.0, 0.88, 0.35))
+				UITheme.apply_label(lbl, 11, accent.lightened(0.3))
 				slot.add_theme_stylebox_override(
 					"panel",
-					UITheme.panel_style(Color(0.30, 0.22, 0.08, 0.95), Color(0.82, 0.62, 0.16), 2, 6, false)
+					UITheme.panel_style(accent.darkened(0.6), accent, 2, 6, false)
 				)
 			else:
-				UITheme.apply_label(lbl, 13, UITheme.COLOR_CREAM)
+				UITheme.apply_label(lbl, 11, UITheme.COLOR_CREAM)
 				slot.add_theme_stylebox_override(
 					"panel",
 					UITheme.panel_style(Color(0.20, 0.16, 0.12, 0.95), Color(0.44, 0.34, 0.22), 2, 6, false)
 				)
 		else:
 			lbl.text = "—"
-			UITheme.apply_label(lbl, 13, UITheme.COLOR_MUTED)
+			UITheme.apply_label(lbl, 11, UITheme.COLOR_MUTED)
 			slot.add_theme_stylebox_override(
 				"panel",
 				UITheme.panel_style(Color(0.20, 0.16, 0.12, 0.95), Color(0.44, 0.34, 0.22), 2, 6, false)
 			)
+
+
+func _build_queue_panel_p2() -> void:
+	_queue_panel_p2 = PanelContainer.new()
+	_queue_panel_p2.name = "QueuePanelP2"
+	_queue_panel_p2.visible = false
+	_queue_panel_p2.z_index = 70
+	_queue_panel_p2.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_queue_panel_p2.offset_left = 20
+	_queue_panel_p2.offset_top = -256
+	_queue_panel_p2.offset_right = 630
+	_queue_panel_p2.offset_bottom = -108
+	_queue_panel_p2.add_theme_stylebox_override(
+		"panel",
+		UITheme.panel_style(Color(0.06, 0.10, 0.20, 0.92), Color(0.28, 0.55, 0.90), 3, 8)
+	)
+	_hud_skin.add_child(_queue_panel_p2)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	_queue_panel_p2.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	margin.add_child(vbox)
+
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 8)
+	vbox.add_child(header)
+
+	var title := Label.new()
+	title.text = "Cola P2"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	UITheme.apply_label(title, 12, Color(0.55, 0.82, 1.0), 1)
+	header.add_child(title)
+
+	var hint := Label.new()
+	hint.text = "Tecla 2 para seleccionar"
+	UITheme.apply_label(hint, 10, UITheme.COLOR_MUTED)
+	header.add_child(hint)
+
+	var slots_row := HBoxContainer.new()
+	slots_row.add_theme_constant_override("separation", 6)
+	vbox.add_child(slots_row)
+
+	_queue_slots_p2.clear()
+	for i in range(MAX_QUEUE_SIZE):
+		var slot := _make_queue_slot(i + 1)
+		slots_row.add_child(slot)
+		_queue_slots_p2.append(slot)
+
+
+func _build_coop_selector() -> void:
+	_coop_selector = Control.new()
+	_coop_selector.name = "CoopSelector"
+	_coop_selector.visible = false
+	_coop_selector.z_index = 72
+	_coop_selector.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	_coop_selector.offset_left = 20
+	_coop_selector.offset_top = -96
+	_coop_selector.offset_right = 230
+	_coop_selector.offset_bottom = -12
+	_hud_skin.add_child(_coop_selector)
+
+	var hbox := HBoxContainer.new()
+	hbox.name = "PlayerBtns"
+	hbox.add_theme_constant_override("separation", 10)
+	hbox.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_coop_selector.add_child(hbox)
+
+	_p1_btn = _make_player_selector_btn(1, Color(1.0, 0.42, 0.58))
+	_p2_btn = _make_player_selector_btn(2, Color(0.28, 0.60, 1.0))
+	hbox.add_child(_p1_btn)
+	hbox.add_child(_p2_btn)
+
+
+func _make_player_selector_btn(pid: int, color: Color) -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.name = "PlayerBtn%d" % pid
+	panel.custom_minimum_size = Vector2(96, 80)
+	panel.add_theme_stylebox_override(
+		"panel",
+		UITheme.panel_style(color.darkened(0.55), color, 3, 10)
+	)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_right", 8)
+	margin.add_theme_constant_override("margin_top", 6)
+	margin.add_theme_constant_override("margin_bottom", 6)
+	panel.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_theme_constant_override("separation", 3)
+	margin.add_child(vbox)
+
+	var name_lbl := Label.new()
+	name_lbl.text = "P%d" % pid
+	name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.apply_label(name_lbl, 22, color.lightened(0.5), 1)
+	vbox.add_child(name_lbl)
+
+	var key_lbl := Label.new()
+	key_lbl.text = "Tecla %d" % pid
+	key_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.apply_label(key_lbl, 10, UITheme.COLOR_MUTED)
+	vbox.add_child(key_lbl)
+
+	return panel
+
+
+func setup_coop_mode(active: bool) -> void:
+	_coop_active = active
+	if _coop_selector:
+		_coop_selector.visible = active
+	if _queue_panel_p2:
+		_queue_panel_p2.visible = active
+	# Reposicionar cola de P1 a la izquierda para hacer espacio a P2
+	if _queue_panel and active:
+		_queue_panel.offset_left = -630
+		_queue_panel.offset_right = -20
+		var title_lbl := _queue_panel.find_child("Title", true, false) as Label
+		if title_lbl:
+			title_lbl.text = "Cola P1"
+
+
+func update_coop_selection(active_id: int) -> void:
+	var p1_active := (active_id == 1)
+	if _p1_btn:
+		var alpha := 1.0 if p1_active else 0.38
+		_p1_btn.modulate = Color(1, 1, 1, alpha)
+	if _p2_btn:
+		var alpha := 1.0 if not p1_active else 0.38
+		_p2_btn.modulate = Color(1, 1, 1, alpha)
 
 
 func _build_nueva_receta_popup() -> void:
@@ -1214,9 +1450,152 @@ func end_game() -> void:
 	game_active = false
 	if game_over_panel:
 		game_over_panel.visible = true
-	if final_score_label:
-		final_score_label.text = "Puntuacion final: " + str(score)
+	if _is_real_game:
+		_show_star_results()
+		if final_score_label:
+			final_score_label.visible = false
+	else:
+		GameState.save_level_result(GameState.selected_level, 1)
+		if final_score_label:
+			final_score_label.text = "Puntuacion final: " + str(score)
 	game_ended.emit(score)
+
+
+func set_game_objectives(thresholds: Array, no_burn: bool) -> void:
+	_is_real_game = true
+	_star_thresholds = thresholds
+	_no_burn_for_3_stars = no_burn
+	if _delivery_counter_pill:
+		_delivery_counter_pill.visible = true
+	_update_delivery_counter_display()
+
+
+func set_game_duration(duration: float) -> void:
+	game_time = duration
+	if timer_label:
+		timer_label.text = format_time(game_time)
+
+
+func register_delivery(pts: int = 0) -> void:
+	_orders_delivered_count += 1
+	_delivery_pts_total += pts
+	_update_delivery_counter_display()
+
+
+func register_order_failure() -> void:
+	_orders_failed_count += 1
+
+
+func register_penalty(amount: int) -> void:
+	_penalty_total += amount
+
+
+func register_burn() -> void:
+	_cakes_burned_count += 1
+
+
+func _update_delivery_counter_display() -> void:
+	if _delivery_counter_lbl == null:
+		return
+	var target: int = _star_thresholds[2] if _star_thresholds.size() >= 3 else 7
+	_delivery_counter_lbl.text = "%d / %d" % [_orders_delivered_count, target]
+
+
+func _compute_stars() -> int:
+	if _star_thresholds.is_empty():
+		return 0
+	var stars := 0
+	if _orders_delivered_count >= _star_thresholds[0]:
+		stars = 1
+	if _star_thresholds.size() >= 2 and _orders_delivered_count >= _star_thresholds[1]:
+		stars = 2
+	if _star_thresholds.size() >= 3 and _orders_delivered_count >= _star_thresholds[2]:
+		stars = 3
+	if stars == 3 and _no_burn_for_3_stars and _cakes_burned_count > 0:
+		stars = 2
+	return stars
+
+
+func _show_star_results() -> void:
+	var stars := _compute_stars()
+	GameState.save_level_result(GameState.selected_level, stars)
+
+	# Star icons + threshold numbers below each
+	var star_row := game_over_panel.find_child("StarRow", true, false) as HBoxContainer
+	if star_row:
+		star_row.visible = true
+		for i in range(_star_icons.size()):
+			var icon := _star_icons[i] as CanvasItem
+			if icon:
+				icon.modulate = Color(1.0, 0.82, 0.0) if i < stars else Color(0.35, 0.35, 0.35, 0.35)
+	# Fill threshold labels per star
+	var thresholds: Array = _star_thresholds if not _star_thresholds.is_empty() else [3, 5, 7]
+	for i in range(_threshold_labels.size()):
+		var lbl := _threshold_labels[i] as Label
+		if lbl == null:
+			continue
+		var t: int = thresholds[i] if i < thresholds.size() else 0
+		if i == 2 and _no_burn_for_3_stars:
+			lbl.text = "%d ped. +\nsin quemar" % t
+		else:
+			lbl.text = "%d ped." % t
+
+	# Receipt-style breakdown
+	if _end_deliveries_lbl:
+		_end_deliveries_lbl.visible = true
+		var total_pts := _delivery_pts_total - _penalty_total
+		var lines: PackedStringArray = []
+		lines.append("Pedidos entregados  ×%d     %d pts" % [_orders_delivered_count, _delivery_pts_total])
+		if _orders_failed_count > 0:
+			lines.append("Pedidos perdidos    ×%d    -%d pts" % [_orders_failed_count, _penalty_total])
+		lines.append("─────────────────────────────")
+		lines.append("TOTAL:               %d pts" % total_pts)
+		_end_deliveries_lbl.text = "\n".join(lines)
+		# Make TOTAL line bigger by updating font size on the label
+		UITheme.apply_label(_end_deliveries_lbl, 17, UITheme.COLOR_INK)
+
+	if _no_burn_lbl and _no_burn_for_3_stars:
+		_no_burn_lbl.visible = true
+		if _cakes_burned_count == 0:
+			_no_burn_lbl.text = "Sin pasteles quemados  ✓"
+			UITheme.apply_label(_no_burn_lbl, 16, UITheme.COLOR_GREEN)
+		else:
+			_no_burn_lbl.text = "Pasteles quemados: %d  ✗" % _cakes_burned_count
+			UITheme.apply_label(_no_burn_lbl, 16, Color(0.8, 0.25, 0.18))
+
+	if _retry_button:
+		_retry_button.visible = true
+
+
+func _on_retry_pressed() -> void:
+	GameState.start_level(GameState.selected_level)
+
+
+func _build_delivery_counter() -> void:
+	if _hud_skin == null:
+		return
+	_delivery_counter_pill = _make_panel(
+		"DeliveryPill", Vector2(160, 48),
+		Color(0.88, 0.97, 0.88, 0.98), UITheme.COLOR_GREEN
+	)
+	_delivery_counter_pill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_delivery_counter_pill.visible = false
+	_hud_skin.add_child(_delivery_counter_pill)
+	_delivery_counter_pill.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_delivery_counter_pill.offset_left = 20
+	_delivery_counter_pill.offset_top = 134
+	_delivery_counter_pill.offset_right = 210
+	_delivery_counter_pill.offset_bottom = 182
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_delivery_counter_pill.add_child(row)
+	row.add_child(UITheme.icon(UITheme.ICON_CHECK, Vector2(20, 20)))
+	_delivery_counter_lbl = Label.new()
+	_delivery_counter_lbl.text = "0 / 7"
+	UITheme.apply_label(_delivery_counter_lbl, 20, UITheme.COLOR_INK, 1)
+	row.add_child(_delivery_counter_lbl)
 
 
 func _set_paused(paused: bool) -> void:
