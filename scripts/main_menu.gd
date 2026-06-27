@@ -11,6 +11,11 @@ var _level_buttons: Array[Button] = []
 var _click_player: AudioStreamPlayer
 var _hover_player: AudioStreamPlayer
 
+var _carousel_index: int = 0
+var _carousel_content: Control = null
+var _carousel_dot_labels: Array = []
+var _carousel_timer: Timer = null
+
 
 func _ready() -> void:
 	_click_player = UITheme.make_sound_player(self, UITheme.CLICK_SOUND)
@@ -21,6 +26,7 @@ func _ready() -> void:
 	play_button.pressed.connect(_on_play_pressed)
 	quit_button.pressed.connect(_on_quit_pressed)
 	_highlight_selection()
+	_start_carousel()
 
 
 func _apply_screen_style() -> void:
@@ -120,77 +126,225 @@ func _build_showcase_panel() -> Control:
 	UITheme.apply_label(subtitle, 20, UITheme.COLOR_MUTED)
 	vbox.add_child(subtitle)
 
-	var recipe := _build_recipe_preview()
-	recipe.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	vbox.add_child(recipe)
+	var carousel := _build_carousel()
+	carousel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	vbox.add_child(carousel)
 
 	return panel
 
 
-func _build_recipe_preview() -> Control:
-	var card := PanelContainer.new()
-	card.add_theme_stylebox_override(
+func _get_slides() -> Array:
+	return [
+		{
+			"type": "recipe",
+			"cake_label": "VANILLA",
+			"badge_bg": Color(1.0, 0.88, 0.4, 1.0),
+			"badge_fg": Color(0.45, 0.26, 0.04),
+			"title": "Pastel de Vainilla",
+			"reward": "160 puntos por completar la cadena",
+			"steps": [
+				["1", "Ing.", Color(0.22, 0.72, 0.44)],
+				["2", "Batir", Color(0.28, 0.52, 0.88)],
+				["3", "Horno", Color(0.88, 0.28, 0.22)],
+				["4", "Vainilla", Color(0.86, 0.76, 0.14)],
+				["5", "Entrega", Color(0.88, 0.64, 0.16)],
+			]
+		},
+		{
+			"type": "recipe",
+			"cake_label": "CHOCO",
+			"badge_bg": Color(0.38, 0.18, 0.06, 1.0),
+			"badge_fg": Color(0.96, 0.88, 0.76),
+			"title": "Pastel de Chocolate",
+			"reward": "160 puntos por completar la cadena",
+			"steps": [
+				["1", "Ing.", Color(0.22, 0.72, 0.44)],
+				["2", "Batir", Color(0.28, 0.52, 0.88)],
+				["3", "Horno", Color(0.88, 0.28, 0.22)],
+				["4", "Chocolate", Color(0.32, 0.16, 0.06)],
+				["5", "Entrega", Color(0.88, 0.64, 0.16)],
+			]
+		},
+		{
+			"type": "recipe",
+			"cake_label": "FRESA",
+			"badge_bg": Color(0.88, 0.14, 0.28, 1.0),
+			"badge_fg": Color(1.0, 0.92, 0.94),
+			"title": "Pastel de Fresa",
+			"reward": "160 puntos por completar la cadena",
+			"steps": [
+				["1", "Ing.", Color(0.22, 0.72, 0.44)],
+				["2", "Batir", Color(0.28, 0.52, 0.88)],
+				["3", "Horno", Color(0.88, 0.28, 0.22)],
+				["4", "Fresa", Color(0.88, 0.14, 0.22)],
+				["5", "Entrega", Color(0.88, 0.64, 0.16)],
+			]
+		},
+		{
+			"type": "tip",
+			"header": "Consejo: Cola de acciones",
+			"text": "Planifica hasta 3 acciones seguidas en la cola antes de moverte. Click derecho cancela la ultima accion encolada.",
+		},
+		{
+			"type": "tip",
+			"header": "Consejo: Cooperativo",
+			"text": "En modo cooperativo divide las estaciones: un jugador bate y hornea, el otro decora y entrega para ganar mas puntos.",
+		},
+	]
+
+
+func _build_carousel() -> Control:
+	var wrapper := VBoxContainer.new()
+	wrapper.add_theme_constant_override("separation", 8)
+
+	_carousel_content = PanelContainer.new()
+	_carousel_content.add_theme_stylebox_override(
 		"panel",
 		UITheme.panel_style(Color(1.0, 0.96, 0.84, 1.0), Color(0.72, 0.54, 0.28), 3, 8)
 	)
+	_carousel_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	wrapper.add_child(_carousel_content)
 
+	var nav := HBoxContainer.new()
+	nav.add_theme_constant_override("separation", 10)
+	nav.alignment = BoxContainer.ALIGNMENT_CENTER
+	wrapper.add_child(nav)
+
+	var prev_btn := Button.new()
+	prev_btn.text = "<"
+	prev_btn.custom_minimum_size = Vector2(34, 26)
+	prev_btn.flat = true
+	UITheme.apply_button(prev_btn, Color(0.82, 0.74, 0.58), Color(0.92, 0.84, 0.68), Color(0.62, 0.54, 0.38))
+	prev_btn.pressed.connect(_carousel_prev)
+	nav.add_child(prev_btn)
+
+	_carousel_dot_labels.clear()
+	for i in range(_get_slides().size()):
+		var dot := Label.new()
+		dot.text = "●"
+		UITheme.apply_label(dot, 14, Color(0.72, 0.64, 0.5))
+		_carousel_dot_labels.append(dot)
+		nav.add_child(dot)
+
+	var next_btn := Button.new()
+	next_btn.text = ">"
+	next_btn.custom_minimum_size = Vector2(34, 26)
+	next_btn.flat = true
+	UITheme.apply_button(next_btn, Color(0.82, 0.74, 0.58), Color(0.92, 0.84, 0.68), Color(0.62, 0.54, 0.38))
+	next_btn.pressed.connect(_carousel_next)
+	nav.add_child(next_btn)
+
+	_show_slide(0)
+	return wrapper
+
+
+func _build_slide_content(slide: Dictionary) -> Control:
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 18)
 	margin.add_theme_constant_override("margin_right", 18)
 	margin.add_theme_constant_override("margin_top", 16)
 	margin.add_theme_constant_override("margin_bottom", 16)
-	card.add_child(margin)
 
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 12)
-	margin.add_child(vbox)
+	if slide["type"] == "recipe":
+		var vbox := VBoxContainer.new()
+		vbox.add_theme_constant_override("separation", 12)
+		margin.add_child(vbox)
 
-	var title_row := HBoxContainer.new()
-	title_row.add_theme_constant_override("separation", 12)
-	vbox.add_child(title_row)
+		var title_row := HBoxContainer.new()
+		title_row.add_theme_constant_override("separation", 12)
+		vbox.add_child(title_row)
 
-	var badge := PanelContainer.new()
-	badge.custom_minimum_size = Vector2(74, 74)
-	badge.add_theme_stylebox_override(
-		"panel",
-		UITheme.panel_style(Color(1.0, 0.72, 0.24, 1.0), Color(0.72, 0.42, 0.12), 3, 8)
-	)
-	var cake := Label.new()
-	cake.text = "CAKE"
-	cake.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	cake.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	UITheme.apply_label(cake, 16, Color(0.34, 0.18, 0.08))
-	badge.add_child(cake)
-	title_row.add_child(badge)
+		var badge := PanelContainer.new()
+		badge.custom_minimum_size = Vector2(72, 72)
+		badge.add_theme_stylebox_override(
+			"panel",
+			UITheme.panel_style(slide["badge_bg"], slide["badge_bg"].darkened(0.25), 3, 8)
+		)
+		var cake_lbl := Label.new()
+		cake_lbl.text = slide["cake_label"]
+		cake_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cake_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		UITheme.apply_label(cake_lbl, 13, slide["badge_fg"])
+		badge.add_child(cake_lbl)
+		title_row.add_child(badge)
 
-	var title_box := VBoxContainer.new()
-	title_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title_row.add_child(title_box)
+		var title_box := VBoxContainer.new()
+		title_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		title_row.add_child(title_box)
 
-	var order_label := Label.new()
-	order_label.text = "Pedido: Pastel de vainilla"
-	UITheme.apply_label(order_label, 24, UITheme.COLOR_INK)
-	title_box.add_child(order_label)
+		var order_label := Label.new()
+		order_label.text = "Pedido: " + slide["title"]
+		UITheme.apply_label(order_label, 20, Color(0.18, 0.13, 0.18))
+		title_box.add_child(order_label)
 
-	var reward := Label.new()
-	reward.text = "160 puntos por completar la cadena"
-	UITheme.apply_label(reward, 16, UITheme.COLOR_MUTED)
-	title_box.add_child(reward)
+		var reward := Label.new()
+		reward.text = slide["reward"]
+		UITheme.apply_label(reward, 14, Color(0.52, 0.46, 0.38))
+		title_box.add_child(reward)
 
-	var steps := HBoxContainer.new()
-	steps.add_theme_constant_override("separation", 8)
-	vbox.add_child(steps)
-	steps.add_child(_make_step_chip("1", "Ing.", UITheme.COLOR_GREEN))
-	steps.add_child(UITheme.icon(UITheme.ICON_ARROW, Vector2(26, 26)))
-	steps.add_child(_make_step_chip("2", "Batir", UITheme.COLOR_BLUE))
-	steps.add_child(UITheme.icon(UITheme.ICON_ARROW, Vector2(26, 26)))
-	steps.add_child(_make_step_chip("3", "Horno", UITheme.COLOR_RED))
-	steps.add_child(UITheme.icon(UITheme.ICON_ARROW, Vector2(26, 26)))
-	steps.add_child(_make_step_chip("4", "Decorar", Color(0.95, 0.48, 0.72)))
-	steps.add_child(UITheme.icon(UITheme.ICON_ARROW, Vector2(26, 26)))
-	steps.add_child(_make_step_chip("5", "Entrega", UITheme.COLOR_YELLOW))
+		var steps := HBoxContainer.new()
+		steps.add_theme_constant_override("separation", 6)
+		vbox.add_child(steps)
+		var step_data: Array = slide["steps"]
+		for j in range(step_data.size()):
+			var s: Array = step_data[j]
+			steps.add_child(_make_step_chip(s[0], s[1], s[2]))
+			if j < step_data.size() - 1:
+				steps.add_child(UITheme.icon(UITheme.ICON_ARROW, Vector2(20, 20)))
+	else:
+		var vbox := VBoxContainer.new()
+		vbox.add_theme_constant_override("separation", 16)
+		vbox.alignment = BoxContainer.ALIGNMENT_CENTER
+		margin.add_child(vbox)
 
-	return card
+		var header := Label.new()
+		header.text = slide["header"]
+		header.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		UITheme.apply_label(header, 18, Color(0.22, 0.52, 0.36), 1)
+		vbox.add_child(header)
+
+		var tip_text := Label.new()
+		tip_text.text = slide["text"]
+		tip_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		tip_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		UITheme.apply_label(tip_text, 15, Color(0.28, 0.24, 0.22))
+		vbox.add_child(tip_text)
+
+	return margin
+
+
+func _show_slide(index: int) -> void:
+	_carousel_index = index
+	for child in _carousel_content.get_children():
+		child.queue_free()
+	_carousel_content.add_child(_build_slide_content(_get_slides()[index]))
+	for i in range(_carousel_dot_labels.size()):
+		var dot: Label = _carousel_dot_labels[i]
+		UITheme.apply_label(dot, 14, Color(0.38, 0.24, 0.10) if i == index else Color(0.72, 0.64, 0.5))
+
+
+func _carousel_next() -> void:
+	_show_slide((_carousel_index + 1) % _get_slides().size())
+	_reset_carousel_timer()
+
+
+func _carousel_prev() -> void:
+	_show_slide((_carousel_index - 1 + _get_slides().size()) % _get_slides().size())
+	_reset_carousel_timer()
+
+
+func _start_carousel() -> void:
+	_carousel_timer = Timer.new()
+	_carousel_timer.wait_time = 4.5
+	_carousel_timer.autostart = true
+	_carousel_timer.timeout.connect(_carousel_next)
+	add_child(_carousel_timer)
+
+
+func _reset_carousel_timer() -> void:
+	if _carousel_timer:
+		_carousel_timer.stop()
+		_carousel_timer.start()
 
 
 func _make_step_chip(number: String, label_text: String, color: Color) -> Control:
@@ -201,7 +355,7 @@ func _make_step_chip(number: String, label_text: String, color: Color) -> Contro
 	var label := Label.new()
 	label.text = "%s. %s" % [number, label_text]
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	UITheme.apply_label(label, 16, Color.WHITE, 1)
+	UITheme.apply_label(label, 14, Color.WHITE, 1)
 	panel.add_child(label)
 	return panel
 
