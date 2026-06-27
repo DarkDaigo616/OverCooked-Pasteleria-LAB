@@ -1,5 +1,8 @@
 extends Control
 
+const MENU_W := 1040
+const MENU_H := 620
+
 @onready var center_panel: PanelContainer = $CenterPanel
 
 var level_list: VBoxContainer
@@ -56,10 +59,11 @@ func _apply_screen_style() -> void:
 			decor.visible = false
 
 	center_panel.set_anchors_preset(Control.PRESET_CENTER)
-	center_panel.offset_left = -520
-	center_panel.offset_top = -310
-	center_panel.offset_right = 520
-	center_panel.offset_bottom = 310
+	center_panel.offset_left = -(MENU_W * 0.5)
+	center_panel.offset_top = -(MENU_H * 0.5)
+	center_panel.offset_right = MENU_W * 0.5
+	center_panel.offset_bottom = MENU_H * 0.5
+
 	center_panel.add_theme_stylebox_override(
 		"panel",
 		UITheme.panel_style(Color(0.98, 0.93, 0.82, 0.98), Color(0.25, 0.18, 0.19), 4, 8)
