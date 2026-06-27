@@ -85,7 +85,7 @@ func _finish_decorating() -> void:
 	if _progress_bar:
 		_progress_bar.show_complete_check(true)
 
-	_show_station_message("%s listo." % _get_finished_display_name(), decoration_type == "vanilla")
+	_show_station_message("%s listo." % _get_finished_display_name(), true)
 
 
 func _validate_cake(item: Node3D) -> Dictionary:

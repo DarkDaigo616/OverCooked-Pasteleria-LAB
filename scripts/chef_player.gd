@@ -35,6 +35,7 @@ var _spawn_position: Vector3 = Vector3.ZERO
 var _last_target: Node3D = null
 var _hover_target: Node3D = null
 var _pending_interaction_target: Node3D = null
+var _pending_action_type: String = "deliver"
 var _move_target: Vector3 = Vector3.ZERO
 var _has_move_target: bool = false
 var _path_points: Array[Vector3] = []
@@ -176,6 +177,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _handle_left_click(screen_position: Vector2) -> void:
 	if _hover_target and is_instance_valid(_hover_target):
 		_pending_interaction_target = _hover_target
+		_pending_action_type = "deliver"
 		_set_navigation_target(_navigation_position_for(_pending_interaction_target))
 		return
 
@@ -592,31 +594,51 @@ func attempt_interaction() -> void:
 func _process_pending_interaction() -> void:
 	if _pending_interaction_target == null or not is_instance_valid(_pending_interaction_target):
 		_pending_interaction_target = null
+		_pending_action_type = "deliver"
 		if queue_mode_enabled:
 			_complete_queue_action()
 		return
 	if global_position.distance_to(_interaction_position_for(_pending_interaction_target)) > interact_range:
 		return
 
-	# En modo cola: esperar si la estacion esta procesando activamente
-	if queue_mode_enabled and _pending_interaction_target.get("is_processing") == true:
+	var target := _pending_interaction_target
+
+	if _pending_action_type == "wait_pickup":
+		# Stay at station until it has a ready output.
+		var ready: bool
+		if target.has_method("has_ready_output"):
+			ready = target.has_ready_output()
+		else:
+			ready = not bool(target.get("is_processing"))
+		if not ready:
+			_has_move_target = false
+			velocity = Vector3.ZERO
+			return
 		_has_move_target = false
 		velocity = Vector3.ZERO
+		if target.has_method("interact"):
+			target.interact(self)
+			interacted_with_station.emit(target)
+			_flash_hud_interaction()
+		_pending_interaction_target = null
+		_pending_action_type = "deliver"
+		if queue_mode_enabled:
+			_complete_queue_action()
 		return
 
+	# "deliver" — place item (or pick up if empty-handed and station has result)
 	_has_move_target = false
 	velocity = Vector3.ZERO
-	if _pending_interaction_target.is_in_group("dropped_item"):
-		if not held_item and pickup_item(_pending_interaction_target):
+	if target.is_in_group("dropped_item"):
+		if not held_item and pickup_item(target):
 			_flash_hud_interaction()
 	else:
-		var target := _pending_interaction_target
 		if target.has_method("interact"):
 			target.interact(self)
 			interacted_with_station.emit(target)
 			_flash_hud_interaction()
 	_pending_interaction_target = null
-
+	_pending_action_type = "deliver"
 	if queue_mode_enabled:
 		_complete_queue_action()
 
@@ -849,16 +871,59 @@ func _enqueue_action(target: Node3D) -> void:
 	if _action_queue.size() >= MAX_QUEUE_SIZE:
 		_show_hud_message("Cola llena — max %d acciones" % MAX_QUEUE_SIZE, false)
 		return
-	if _pending_interaction_target == target:
-		_show_hud_message("Ya en progreso", false)
-		return
+
+	# Check if a wait_pickup for this target already exists (active or queued).
+	var has_wait := (_pending_interaction_target == target and _pending_action_type == "wait_pickup")
 	for action in _action_queue:
-		if action.get("target") == target:
-			_show_hud_message("Ya esta en la cola", false)
+		if action.get("target") == target and action.get("action_type") == "wait_pickup":
+			has_wait = true
+
+	# If the station is actively processing, add wait_pickup directly — no deliver needed.
+	if target.get("is_processing") == true:
+		if has_wait:
+			_show_hud_message("Ya hay una espera en cola", false)
 			return
+		var base_name := _get_target_display_name(target)
+		_action_queue.append({
+			"target": target,
+			"display_name": "Esperar: " + base_name,
+			"action_type": "wait_pickup",
+		})
+		_emit_queue_update()
+		if _pending_interaction_target == null:
+			_start_next_queued_action()
+		return
+
+	# Station is not processing — count existing deliver entries for this target.
+	var deliver_count := 0
+	if _pending_interaction_target == target and _pending_action_type == "deliver":
+		deliver_count += 1
+	for action in _action_queue:
+		if action.get("target") == target and action.get("action_type", "deliver") == "deliver":
+			deliver_count += 1
+
+	# A station that holds N items allows N deliver slots before one wait_pickup.
+	var max_delivers: int = 1
+	var raw_max: Variant = target.get("max_items")
+	if raw_max is int and raw_max > 0:
+		max_delivers = raw_max
+
+	var action_type: String
+	if deliver_count < max_delivers and not has_wait:
+		action_type = "deliver"
+	elif deliver_count > 0 and not has_wait:
+		action_type = "wait_pickup"
+	else:
+		_show_hud_message("Ya esta en la cola", false)
+		return
+
+	var base_name := _get_target_display_name(target)
+	var display_name := base_name if action_type == "deliver" else ("Esperar: " + base_name)
+
 	_action_queue.append({
 		"target": target,
-		"display_name": _get_target_display_name(target),
+		"display_name": display_name,
+		"action_type": action_type,
 	})
 	_emit_queue_update()
 	if _pending_interaction_target == null:
@@ -871,6 +936,7 @@ func cancel_action_queue() -> void:
 	var had_active := _pending_interaction_target != null
 	_action_queue.clear()
 	_pending_interaction_target = null
+	_pending_action_type = "deliver"
 	_has_move_target = false
 	if had_active:
 		_queue_penalty_remaining = PLAN_CHANGE_PENALTY_SECONDS
@@ -884,6 +950,7 @@ func _start_next_queued_action() -> void:
 		var target: Node3D = action.get("target")
 		if is_instance_valid(target):
 			_pending_interaction_target = target
+			_pending_action_type = action.get("action_type", "deliver")
 			_set_navigation_target(_navigation_position_for(target))
 			return
 		# Objetivo invalido: saltar y continuar

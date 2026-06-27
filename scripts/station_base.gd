@@ -61,6 +61,10 @@ func set_highlighted(active: bool) -> void:
 		_highlight_ring.visible = active
 
 
+func has_ready_output() -> bool:
+	return not is_processing and not current_items.is_empty()
+
+
 func get_display_name() -> String:
 	if has_meta("display_name"):
 		return str(get_meta("display_name"))

@@ -366,7 +366,7 @@ static func _build_ingredient(data: Dictionary) -> StaticBody3D:
 	body.set_script(script)
 	body.ingredient_type = ing
 	body.ingredient_color = INGREDIENT_COLORS.get(ing, Color.WHITE)
-	body.pickup_time = data.get("pickup_time", 1.0)
+	body.pickup_time = 0.0
 	if ing == "cake_batter":
 		body.ingredient_mesh_scale = 0.75
 	elif data.has("mesh_scale"):

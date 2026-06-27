@@ -37,6 +37,7 @@ func _process(delta: float) -> void:
 
 	if cooking_timer >= cook_time and not _item_cooked:
 		_item_cooked = true
+		is_processing = false  # baking done — queued player can now pick up
 		if item.get_meta("ingredient_type", "") == "cake_batter":
 			item.name = "cake"
 			item.set_meta("ingredient_type", "cake")
@@ -64,6 +65,7 @@ func _process(delta: float) -> void:
 		item.set_meta(COOKING_PROGRESS_META, cook_time + burn_time)
 		is_burned = true
 		is_cooking = false
+		is_processing = false
 		item_burned.emit()
 		if item.has_meta("ingredient_type"):
 			var burn_scale := 0.95 if item.get_meta("ingredient_type", "") == "cake" else 0.45
@@ -133,12 +135,14 @@ func start_cooking() -> void:
 	cooking_timer = _get_saved_progress(item)
 	is_burned = item != null and item.get_meta("state", "") == "burned"
 	_item_cooked = cooking_timer >= cook_time or (item != null and item.get_meta("state", "") in ["baked", "cooked"])
+	is_processing = not _item_cooked and not is_burned
 	if _progress_bar:
 		_update_cook_bar()
 
 
 func reset_cooking() -> void:
 	is_cooking = false
+	is_processing = false
 	cooking_timer = 0.0
 	is_burned = false
 	_item_cooked = false

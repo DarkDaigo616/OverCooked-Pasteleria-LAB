@@ -168,6 +168,10 @@ func _place_finished_product(product: Node3D) -> void:
 	item_placed.emit(product)
 
 
+func has_ready_output() -> bool:
+	return not is_processing and _has_finished_product()
+
+
 func _show_station_message(text: String, success: bool) -> void:
 	var hud := get_tree().get_first_node_in_group("game_hud") as GameHUD
 	if hud:
