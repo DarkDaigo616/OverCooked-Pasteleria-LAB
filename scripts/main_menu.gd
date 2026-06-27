@@ -10,6 +10,11 @@ var _selected_level: int = 1
 var _level_buttons: Array[Button] = []
 var _click_player: AudioStreamPlayer
 var _hover_player: AudioStreamPlayer
+var _carousel_index: int = 0
+var _carousel_content: Control = null
+var _carousel_dot_labels: Array = []
+var _carousel_timer: Timer = null
+var _dev_button: Button = null
 
 
 func _ready() -> void:
@@ -270,15 +275,15 @@ func _build_slide_content(slide: Dictionary) -> Control:
 		title_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		title_row.add_child(title_box)
 
-	var order_label := Label.new()
-	order_label.text = "Pedido: Pastel de vainilla"
-	UITheme.apply_label(order_label, 24, UITheme.COLOR_INK)
-	title_box.add_child(order_label)
+		var order_label := Label.new()
+		order_label.text = "Pedido: " + slide["title"]
+		UITheme.apply_label(order_label, 20, Color(0.18, 0.13, 0.18))
+		title_box.add_child(order_label)
 
-	var reward := Label.new()
-	reward.text = "160 puntos por completar la cadena"
-	UITheme.apply_label(reward, 16, UITheme.COLOR_MUTED)
-	title_box.add_child(reward)
+		var reward := Label.new()
+		reward.text = slide["reward"]
+		UITheme.apply_label(reward, 14, Color(0.52, 0.46, 0.38))
+		title_box.add_child(reward)
 
 		var steps := HBoxContainer.new()
 		steps.add_theme_constant_override("separation", 6)
