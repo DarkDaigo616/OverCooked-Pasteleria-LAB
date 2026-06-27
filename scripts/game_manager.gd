@@ -68,8 +68,3 @@ func _on_game_ended(final_score: int) -> void:
 		hud.interaction_hint.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9))
 	print("=== JUEGO TERMINADO ===")
 	print("Puntuacion final: ", final_score)
-
-
-func _input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_cancel"):
-		GameState.go_to_menu()

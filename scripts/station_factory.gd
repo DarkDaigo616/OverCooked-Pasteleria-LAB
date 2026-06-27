@@ -278,11 +278,67 @@ static func _add_mixer_props(body: Node3D, accent: Color) -> void:
 	whisk.rotation_degrees.z = 18.0
 
 
-static func _add_decoration_props(body: Node3D, accent: Color) -> void:
-	_add_cylinder(body, "IcingBowl", 0.28, 0.12, Vector3(-0.35, 1.31, -0.05), Color(1.0, 0.94, 0.8))
-	_add_cylinder(body, "Icing", 0.2, 0.08, Vector3(-0.35, 1.41, -0.05), accent.lightened(0.22))
-	_add_box(body, "SpatulaHandle", Vector3(0.08, 0.08, 0.6), Vector3(0.28, 1.42, 0.02), Color(0.58, 0.36, 0.2))
-	_add_box(body, "SpatulaBlade", Vector3(0.24, 0.04, 0.16), Vector3(0.52, 1.46, 0.16), Color(0.82, 0.84, 0.86))
+static func _add_decoration_props(_body: Node3D, _accent: Color) -> void:
+	pass  # typed props are added per decoration_type in _build_decoration
+
+
+static func _tint_all_meshes(node: Node, color: Color) -> void:
+	if node is MeshInstance3D:
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = color
+		mat.roughness = 0.65
+		(node as MeshInstance3D).material_override = mat
+	for child in node.get_children():
+		_tint_all_meshes(child, color)
+
+
+static func _add_tinted_prop(parent: Node3D, prop_name: String, path: String, pos: Vector3, scale_v: Vector3, color: Color) -> bool:
+	if not ResourceLoader.exists(path):
+		return false
+	var res := load(path)
+	var node: Node3D = null
+	if res is PackedScene:
+		node = (res as PackedScene).instantiate() as Node3D
+	elif res is Mesh:
+		var mi := MeshInstance3D.new()
+		mi.mesh = res as Mesh
+		node = mi
+	if node == null:
+		return false
+	node.name = prop_name
+	node.position = pos
+	node.scale = scale_v
+	_tint_all_meshes(node, color)
+	parent.add_child(node)
+	return true
+
+
+static func _add_typed_decoration_props(body: Node3D, decoration_type: String) -> void:
+	# Rolled dough as shared table mat (wide flat shape, cream color)
+	if not _add_tinted_prop(body, "DoughProp",
+			TINY_TREATS_BASE + "dough_rolled_B.gltf",
+			Vector3(0.22, 1.22, 0.05), Vector3.ONE * 1.0,
+			Color(0.96, 0.90, 0.78)):
+		_add_box(body, "DoughFallback", Vector3(0.72, 0.06, 0.72), Vector3(0.22, 1.26, 0.05), Color(0.96, 0.90, 0.78))
+
+	# Type-specific bottle/jar — distinct model + color per station
+	# ketchup/mustard native size: 0.30 wide × 0.779 tall → scale 1.8 = 0.54 wide
+	# jar_D_medium native size: 0.50 wide × 0.65 tall  → scale 1.4 = 0.70 wide
+	var bp := Vector3(-0.44, 1.22, -0.02)
+	match decoration_type:
+		"vanilla":
+			if not _add_tinted_prop(body, "DecoBottle", KAYKIT_BASE + "mustard.gltf", bp, Vector3.ONE * 1.8, Color(0.96, 0.90, 0.42)):
+				_add_cylinder(body, "VanillaBottle", 0.18, 0.68, Vector3(-0.44, 1.58, -0.02), Color(0.96, 0.90, 0.42))
+		"chocolate":
+			if not _add_tinted_prop(body, "DecoBottle", KAYKIT_BASE + "jar_D_medium.gltf", bp, Vector3.ONE * 1.4, Color(0.28, 0.14, 0.06)):
+				_add_cylinder(body, "ChocBottle", 0.22, 0.56, Vector3(-0.44, 1.52, -0.02), Color(0.28, 0.14, 0.06))
+		"strawberry":
+			if not _add_tinted_prop(body, "DecoBottle", KAYKIT_BASE + "ketchup.gltf", bp, Vector3.ONE * 1.8, Color(0.88, 0.14, 0.22)):
+				_add_cylinder(body, "StrawBottle", 0.18, 0.68, Vector3(-0.44, 1.58, -0.02), Color(0.88, 0.14, 0.22))
+
+	# Spatula shared across all types
+	_add_box(body, "SpatulaHandle", Vector3(0.08, 0.08, 0.52), Vector3(0.28, 1.40, 0.02), Color(0.58, 0.36, 0.2))
+	_add_box(body, "SpatulaBlade", Vector3(0.22, 0.04, 0.14), Vector3(0.50, 1.44, 0.14), Color(0.82, 0.84, 0.86))
 
 
 static func _add_recipe_book_props(body: Node3D, accent: Color) -> void:
@@ -366,7 +422,7 @@ static func _build_ingredient(data: Dictionary) -> StaticBody3D:
 	body.set_script(script)
 	body.ingredient_type = ing
 	body.ingredient_color = INGREDIENT_COLORS.get(ing, Color.WHITE)
-	body.pickup_time = data.get("pickup_time", 1.0)
+	body.pickup_time = 0.0
 	if ing == "cake_batter":
 		body.ingredient_mesh_scale = 0.75
 	elif data.has("mesh_scale"):
@@ -418,6 +474,7 @@ static func _build_decoration(data: Dictionary) -> StaticBody3D:
 	body.set_script(load("res://scripts/decoration_station.gd"))
 	body.decoration_type = decoration_type
 	body.decoration_time = data.get("decoration_time", 3.0)
+	_add_typed_decoration_props(body, decoration_type)
 	_add_item_holder(body)
 	_add_progress_bar(body)
 	return body

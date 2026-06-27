@@ -13,6 +13,12 @@ extends Node3D
 const BakeryPropBuilderScript = preload("res://scenes/props/bakery_prop_builder.gd")
 
 var _navigation_obstacles: Array[Rect2] = []
+var chef2: ChefPlayer = null
+var _coop_mode: bool = false
+var _active_player_id: int = 1
+var _is_real_game: bool = false
+var _orders_delivered_real: int = 0
+var _cakes_burned_real: int = 0
 
 const WALL_HEIGHT := 3.5
 const PLAY_HALF := 16.5
@@ -81,9 +87,15 @@ func _ready() -> void:
 	if chef:
 		chef.configure_level_bounds(PLAY_HALF, spawn)
 		chef.configure_navigation_obstacles(_navigation_obstacles)
-		if level_id == 4:
+		var has_queue: bool = layout.get("queue_mode", false)
+		var has_coop: bool = layout.get("coop_mode", false)
+		if has_queue and not has_coop:
 			chef.queue_mode_enabled = true
 			chef._emit_queue_update()
+		if has_coop:
+			_setup_coop_mode(layout)
+	if layout.get("game_mode", "") == "real":
+		_setup_real_game_mode(layout)
 	if level_label:
 		level_label.text = "Nivel %d: %s" % [level_id, layout.get("name", "")]
 	if camera:
@@ -416,6 +428,77 @@ func _build_floor_border() -> void:
 		border.add_child(mi)
 
 
+func _setup_coop_mode(layout: Dictionary) -> void:
+	_coop_mode = true
+
+	# Configurar P1 (ya existe en escena)
+	chef.player_id = 1
+	chef.player_color = Color(1.0, 0.42, 0.58)
+	chef.show_player_indicator = true
+	chef.queue_mode_enabled = true
+	chef.is_active_player = true
+	chef._add_player_color_ring()
+	chef._emit_queue_update()
+
+	# Instanciar P2
+	var chef_scene := load("res://scenes/player/chef_player.tscn") as PackedScene
+	if chef_scene == null:
+		push_error("CoopMode: no se pudo cargar chef_player.tscn")
+		return
+	chef2 = chef_scene.instantiate() as ChefPlayer
+	if chef2 == null:
+		return
+
+	chef2.player_id = 2
+	chef2.player_color = Color(0.28, 0.60, 1.0)
+	chef2.show_player_indicator = true
+	chef2.queue_mode_enabled = true
+	chef2.is_active_player = false
+	add_child(chef2)
+
+	var spawn_p2: Vector3 = layout.get("spawn_p2", Vector3(6, 1, 7))
+	spawn_p2.y = 1.0
+	chef2.position = spawn_p2
+	chef2.configure_level_bounds(PLAY_HALF, spawn_p2)
+	chef2.configure_navigation_obstacles(_navigation_obstacles)
+	chef2._emit_queue_update()
+
+	# Notificar HUD
+	var hud := _get_hud()
+	if hud and hud.has_method("setup_coop_mode"):
+		hud.setup_coop_mode(true)
+
+	_set_active_player(1)
+
+
+func _set_active_player(id: int) -> void:
+	_active_player_id = id
+	if chef:
+		chef.is_active_player = (id == 1)
+	if chef2:
+		chef2.is_active_player = (id == 2)
+	var hud := _get_hud()
+	if hud and hud.has_method("update_coop_selection"):
+		hud.update_coop_selection(id)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not _coop_mode:
+		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_1:
+				_set_active_player(1)
+				get_viewport().set_input_as_handled()
+			KEY_2:
+				_set_active_player(2)
+				get_viewport().set_input_as_handled()
+
+
+func _get_hud() -> Node:
+	return get_node_or_null("GameManager/GameHUD")
+
+
 func _place_player(spawn: Vector3) -> void:
 	if chef:
 		chef.position = spawn
@@ -426,3 +509,49 @@ func _find_level_label() -> Label:
 	if hud == null:
 		return null
 	return hud.find_child("LevelLabel", true, false) as Label
+
+
+func _setup_real_game_mode(layout: Dictionary) -> void:
+	_is_real_game = true
+	var hud := _get_hud() as GameHUD
+	if hud == null:
+		return
+	var thresholds: Array = layout.get("star_thresholds", [3, 5, 7])
+	var no_burn: bool = layout.get("no_burn_for_3_stars", false)
+	var duration: float = layout.get("duration", 180.0)
+	hud.set_game_objectives(thresholds, no_burn)
+	hud.set_game_duration(duration)
+	var order_mgr := get_tree().get_first_node_in_group("order_manager") as OrderManager
+	if order_mgr:
+		order_mgr.order_completed.connect(_on_real_game_delivery)
+		order_mgr.order_failed.connect(_on_real_game_failure)
+		order_mgr.order_penalty_applied.connect(_on_real_game_penalty)
+	for station in stations_root.get_children():
+		if station is CookingStation:
+			station.item_burned.connect(_on_cake_burned)
+
+
+func _on_real_game_delivery(_recipe: Recipe, pts: int) -> void:
+	_orders_delivered_real += 1
+	var hud := _get_hud() as GameHUD
+	if hud:
+		hud.register_delivery(pts)
+
+
+func _on_real_game_failure(_recipe: Recipe) -> void:
+	var hud := _get_hud() as GameHUD
+	if hud:
+		hud.register_order_failure()
+
+
+func _on_real_game_penalty(amount: int) -> void:
+	var hud := _get_hud() as GameHUD
+	if hud:
+		hud.register_penalty(amount)
+
+
+func _on_cake_burned() -> void:
+	_cakes_burned_real += 1
+	var hud := _get_hud() as GameHUD
+	if hud:
+		hud.register_burn()
