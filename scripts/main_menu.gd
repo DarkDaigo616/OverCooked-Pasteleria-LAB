@@ -107,18 +107,21 @@ func _build_showcase_panel() -> Control:
 
 	var eyebrow := Label.new()
 	eyebrow.text = "PASTELERIA EN CADENA"
-	UITheme.apply_label(eyebrow, 18, Color(0.23, 0.42, 0.45))
+	eyebrow.custom_minimum_size = Vector2(0, 24)
+	UITheme.apply_label(eyebrow, 13, Color(0.23, 0.42, 0.45))
 	vbox.add_child(eyebrow)
 
 	var title := Label.new()
 	title.text = "PASTEL RUSH"
-	UITheme.apply_label(title, 64, Color(0.18, 0.13, 0.18), 2)
+	title.custom_minimum_size = Vector2(0, 72)
+	UITheme.apply_label(title, 50, Color(0.18, 0.13, 0.18), 2)
 	vbox.add_child(title)
 
 	var subtitle := Label.new()
 	subtitle.text = "Toma ingredientes, mezcla, hornea, decora y entrega antes de que el pedido se enfrie."
 	subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	UITheme.apply_label(subtitle, 20, UITheme.COLOR_MUTED)
+	subtitle.custom_minimum_size = Vector2(0, 50)
+	UITheme.apply_label(subtitle, 16, UITheme.COLOR_MUTED)
 	vbox.add_child(subtitle)
 
 	var recipe := _build_recipe_preview()
@@ -170,12 +173,14 @@ func _build_recipe_preview() -> Control:
 
 	var order_label := Label.new()
 	order_label.text = "Pedido: Pastel de vainilla"
-	UITheme.apply_label(order_label, 24, UITheme.COLOR_INK)
+	order_label.custom_minimum_size = Vector2(0, 28)
+	UITheme.apply_label(order_label, 18, UITheme.COLOR_INK)
 	title_box.add_child(order_label)
 
 	var reward := Label.new()
 	reward.text = "160 puntos por completar la cadena"
-	UITheme.apply_label(reward, 16, UITheme.COLOR_MUTED)
+	reward.custom_minimum_size = Vector2(0, 22)
+	UITheme.apply_label(reward, 13, UITheme.COLOR_MUTED)
 	title_box.add_child(reward)
 
 	var steps := HBoxContainer.new()
@@ -202,7 +207,7 @@ func _make_step_chip(number: String, label_text: String, color: Color) -> Contro
 	var label := Label.new()
 	label.text = "%s. %s" % [number, label_text]
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	UITheme.apply_label(label, 16, Color.WHITE, 1)
+	UITheme.apply_label(label, 13, Color.WHITE, 1)
 	panel.add_child(label)
 	return panel
 
@@ -229,7 +234,9 @@ func _build_controls_panel() -> Control:
 	var heading := Label.new()
 	heading.text = "Seleccion de nivel"
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	UITheme.apply_label(heading, 28, UITheme.COLOR_INK)
+	heading.custom_minimum_size = Vector2(0, 36)
+	heading.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	UITheme.apply_label(heading, 20, UITheme.COLOR_INK)
 	vbox.add_child(heading)
 
 	level_list = VBoxContainer.new()

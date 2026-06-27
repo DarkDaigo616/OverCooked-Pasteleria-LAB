@@ -633,12 +633,12 @@ func _build_queue_panel() -> void:
 	title.name = "Title"
 	title.text = "Cola de Acciones"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	UITheme.apply_label(title, 15, UITheme.COLOR_YELLOW, 1)
+	UITheme.apply_label(title, 12, UITheme.COLOR_YELLOW, 1)
 	header.add_child(title)
 
 	var hint := Label.new()
 	hint.text = "Click derecho = cancelar"
-	UITheme.apply_label(hint, 12, UITheme.COLOR_MUTED)
+	UITheme.apply_label(hint, 10, UITheme.COLOR_MUTED)
 	header.add_child(hint)
 
 	var slots_row := HBoxContainer.new()
@@ -675,9 +675,9 @@ func _make_queue_slot(slot_number: int) -> PanelContainer:
 
 	var num := Label.new()
 	num.text = str(slot_number)
-	num.custom_minimum_size = Vector2(16, 0)
+	num.custom_minimum_size = Vector2(14, 0)
 	num.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	UITheme.apply_label(num, 13, UITheme.COLOR_MUTED)
+	UITheme.apply_label(num, 11, UITheme.COLOR_MUTED)
 	num.name = "Num"
 	hbox.add_child(num)
 
@@ -685,7 +685,7 @@ func _make_queue_slot(slot_number: int) -> PanelContainer:
 	lbl.text = "—"
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	UITheme.apply_label(lbl, 13, UITheme.COLOR_MUTED)
+	UITheme.apply_label(lbl, 11, UITheme.COLOR_MUTED)
 	lbl.name = "ActionLabel"
 	hbox.add_child(lbl)
 
@@ -716,20 +716,20 @@ func _update_queue_display(panel: PanelContainer, slots: Array, queue: Array, ac
 			var action: Dictionary = queue[i]
 			lbl.text = action.get("display_name", "?")
 			if i == 0:
-				UITheme.apply_label(lbl, 13, accent.lightened(0.3))
+				UITheme.apply_label(lbl, 11, accent.lightened(0.3))
 				slot.add_theme_stylebox_override(
 					"panel",
 					UITheme.panel_style(accent.darkened(0.6), accent, 2, 6, false)
 				)
 			else:
-				UITheme.apply_label(lbl, 13, UITheme.COLOR_CREAM)
+				UITheme.apply_label(lbl, 11, UITheme.COLOR_CREAM)
 				slot.add_theme_stylebox_override(
 					"panel",
 					UITheme.panel_style(Color(0.20, 0.16, 0.12, 0.95), Color(0.44, 0.34, 0.22), 2, 6, false)
 				)
 		else:
 			lbl.text = "—"
-			UITheme.apply_label(lbl, 13, UITheme.COLOR_MUTED)
+			UITheme.apply_label(lbl, 11, UITheme.COLOR_MUTED)
 			slot.add_theme_stylebox_override(
 				"panel",
 				UITheme.panel_style(Color(0.20, 0.16, 0.12, 0.95), Color(0.44, 0.34, 0.22), 2, 6, false)
@@ -770,12 +770,12 @@ func _build_queue_panel_p2() -> void:
 	var title := Label.new()
 	title.text = "Cola P2"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	UITheme.apply_label(title, 15, Color(0.55, 0.82, 1.0), 1)
+	UITheme.apply_label(title, 12, Color(0.55, 0.82, 1.0), 1)
 	header.add_child(title)
 
 	var hint := Label.new()
 	hint.text = "Tecla 2 para seleccionar"
-	UITheme.apply_label(hint, 11, UITheme.COLOR_MUTED)
+	UITheme.apply_label(hint, 10, UITheme.COLOR_MUTED)
 	header.add_child(hint)
 
 	var slots_row := HBoxContainer.new()
