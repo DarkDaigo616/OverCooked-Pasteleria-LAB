@@ -1,6 +1,6 @@
 # Overcooked Style Game - Proyecto Godot
 
-**Version:** 0.7.0
+**Version:** 0.8.0
 
 ## Descripcion
 
@@ -9,17 +9,32 @@ Juego de pasteleria estilo Overcooked creado en Godot 4.x. Controlas a un chef (
 ## Controles
 
 - **Click izquierdo**: Mover al chef / interactuar con estaciones
-- **Shift + Click izquierdo**: Añadir accion a la cola (Niveles 4 y 5)
-- **Click derecho**: Cancelar cola de acciones (Niveles 4 y 5)
-- **Tecla 1**: Seleccionar P1 (Nivel 5 cooperativo)
-- **Tecla 2**: Seleccionar P2 (Nivel 5 cooperativo)
+- **Shift + Click izquierdo**: Añadir accion a la cola (Niveles 4 en adelante)
+- **Click derecho**: Cancelar cola de acciones
+- **Tecla 1**: Seleccionar P1 (modos cooperativos)
+- **Tecla 2**: Seleccionar P2 (modos cooperativos)
 - **E o Espacio**: Interactuar con estaciones
 - **Q**: Soltar objeto que llevas en mano
 - **Escape**: Pausar / Menu
 
 ---
 
-## INTRODUCCION — Niveles 1 al 5
+## Categorias de niveles
+
+El menu organiza los niveles en 4 categorias:
+
+| Categoria | Niveles | Descripcion |
+|-----------|---------|-------------|
+| Intro | 1 | Tutorial de mecanicas basicas |
+| Pasteleria | 2, 3, 4 | Recetas completas, tiempo y cola de acciones |
+| Cooperativo | 5 | Dos jugadores en la misma pantalla |
+| Desafios | 6, 7 | Niveles reales con estrellas y tiempo limite |
+
+Los niveles de Desafios se desbloquean en orden: hay que completar el anterior para acceder al siguiente.
+
+---
+
+## INTRO — Nivel 1
 
 ### Nivel 1 — Introduccion
 Familiarizate con el flujo basico: toma masa pre-mezclada, hornea y entrega.
@@ -28,10 +43,12 @@ Familiarizate con el flujo basico: toma masa pre-mezclada, hornea y entrega.
 
 ---
 
-### Nivel 2 — Cadena de Receta
-Prepara la receta desde cero: mezcla harina + huevo + azucar, hornea y decora.
+## PASTELERIA — Niveles 2 al 4
 
-**Receta:** Pastel de vainilla — harina + huevo + azucar → mezcla → horno → decorar (160 pts, 90s)
+### Nivel 2 — Cadena de Receta
+Prepara la receta desde cero: mezcla harina + huevo, hornea y decora.
+
+**Receta:** Pastel de vainilla — harina + huevo → mezcla → horno → decorar (160 pts, 90s)
 
 ---
 
@@ -56,10 +73,11 @@ Planea hasta **3 acciones consecutivas** con Shift+click.
 
 **Reglas de la cola:**
 - Shift + Click en una estacion: encola la accion
-- Click derecho: cancela toda la cola (penalizacion de 2s)
-- No se puede encolar la misma estacion dos veces
+- Click derecho: cancela la ultima accion encolada
 
 ---
+
+## COOPERATIVO — Nivel 5
 
 ### Nivel 5 — Cooperativo Local
 Dos jugadores en la misma pantalla. **Tecla 1** controla P1 (rosa), **Tecla 2** controla P2 (azul).
@@ -77,10 +95,10 @@ Dos jugadores en la misma pantalla. **Tecla 1** controla P1 (rosa), **Tecla 2** 
 
 ---
 
-## EL JUEGO — Niveles 6 en adelante
+## DESAFIOS — Niveles 6 y 7
 
-### Nivel 6 — Pasteleria de barrio  _(Etapa 7)_
-El primer nivel del juego real. **3 minutos**, 3 tipos de pastel, sistema de estrellas.
+### Nivel 6 — Pasteleria de barrio
+El primer nivel del juego real. **3 minutos**, 3 tipos de pastel, sistema de estrellas. Cooperativo.
 
 **Duracion:** 3 minutos (180s)
 
@@ -96,14 +114,32 @@ El primer nivel del juego real. **3 minutos**, 3 tipos de pastel, sistema de est
 |-----------|-----------|
 | ★☆☆ | Entregar 3 pedidos |
 | ★★☆ | Entregar 5 pedidos |
-| ★★★ | Entregar 7 pedidos Y no quemar pasteles |
+| ★★★ | Entregar 7 pedidos sin quemar pasteles |
 
-**Disenio del nivel:**
-- Flujo izquierda → derecha: ingredientes → batidora → horno → decorar → entregar
-- Dos hornos activos simultaneamente: requiere vigilar tiempos de quemado (12s tras coccion)
-- Tres estaciones de decoracion (vainilla, chocolate, fresa)
-- Contador de pedidos visible en HUD durante la partida
-- Pantalla de resultados con estrellas animadas y boton de reintentar
+---
+
+### Nivel 7 — Turno de Noche  _(Etapa 8)_
+Nivel de desafio disenado por restricciones. **4 minutos**, cooperativo, pedidos frecuentes.
+
+**Restriccion:** Una sola batidora (cuello de botella) frente a 2 hornos y 3 decoradoras. El resto del equipo sobra — solo la batidora limita el ritmo de produccion.
+
+**Objetivo:** Mantener la batidora activa en todo momento. Si la batidora para, hornos y decoradoras quedan ociosos aunque esten libres.
+
+**Duracion:** 4 minutos (240s) | Pedidos cada 16s
+
+| Pedido | Puntos | Tiempo |
+|--------|--------|--------|
+| Pastel de vainilla | 140 | 80s |
+| Pastel de chocolate | 150 | 80s |
+| Pastel con fresa | 150 | 80s |
+
+**Sistema de estrellas:**
+
+| Estrellas | Condicion |
+|-----------|-----------|
+| ★☆☆ | Entregar 4 pedidos |
+| ★★☆ | Entregar 7 pedidos |
+| ★★★ | Entregar 10 pedidos sin quemar pasteles |
 
 ---
 
@@ -140,7 +176,8 @@ OvercookedGame/
 │   ├── game_hud.gd            # Interfaz: pedidos, timer, puntos, colas, estrellas
 │   ├── order_manager.gd       # Pedidos, timers, bonus/penalizacion
 │   ├── recipe.gd              # Definicion de recetas
-│   ├── level_layouts.gd       # Layouts de los 6 niveles
+│   ├── level_layouts.gd       # Layouts de los 7 niveles (mecanicas de cocina)
+│   ├── level_registry.gd      # Metadatos de niveles: nombre, categoria, desbloqueo (autoload)
 │   ├── kitchen_level.gd       # Carga y construccion del nivel, modo real, modo coop
 │   ├── station_factory.gd     # Construccion de estaciones
 │   ├── station_base.gd        # Base para todas las estaciones
@@ -154,7 +191,7 @@ OvercookedGame/
 │   ├── item_visuals.gd        # Visuales de ingredientes y pasteles
 │   ├── station_visuals.gd     # Visuales de estaciones
 │   ├── ui_theme.gd            # Tema visual de la UI
-│   ├── game_state.gd          # Estado global (autoload)
+│   ├── game_state.gd          # Estado global: progreso, dev mode (autoload)
 │   └── physics_layers.gd      # Capas de fisica
 ├── scenes/
 │   ├── main_menu.tscn
@@ -169,6 +206,18 @@ OvercookedGame/
 
 ---
 
+## Modo desarrollador (Dev Mode)
+
+El boton **Dev: OFF** en el menu activa el modo desarrollador:
+
+- Permite jugar cualquier nivel sin haber completado los anteriores
+- Muestra los niveles desbloqueados por dev con etiqueta `[DEV]` en purpura
+- **No guarda estrellas ni progreso** mientras dev mode esta activo
+- El boton **Borrar prog.** (rojo, solo visible en dev mode) resetea todo el progreso guardado
+- Al desactivar dev mode, el menu vuelve al estado real del jugador
+
+---
+
 ## Historial de Etapas
 
 | Version | Etapa | Descripcion |
@@ -180,6 +229,7 @@ OvercookedGame/
 | 0.5.0 | Etapa 5 | Cola de acciones (Nivel 4): Shift+click encola, espera automatica, click derecho cancela |
 | 0.6.0 | Etapa 6 | Cooperativo local (Nivel 5): P1/P2 con teclas 1-2, colas independientes, menu de pausa con ESC |
 | 0.7.0 | Etapa 7 | Primer nivel real (Nivel 6 "Pasteleria de barrio"): sistema de estrellas, contador de pedidos, 3 min, reintentar |
+| 0.8.0 | Etapa 8 | Nivel 7 "Turno de Noche" (diseno por restricciones); menu por categorias (Intro/Pasteleria/Coop/Desafios); desbloqueo secuencial; dev mode separado del progreso real |
 
 ---
 

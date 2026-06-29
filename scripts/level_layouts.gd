@@ -5,7 +5,7 @@ class_name LevelLayouts
 
 
 static func get_level_count() -> int:
-	return 6
+	return 7
 
 
 static func get_layout(level_id: int) -> Dictionary:
@@ -20,6 +20,8 @@ static func get_layout(level_id: int) -> Dictionary:
 			return _coop_layout()
 		6:
 			return _barrio_layout()
+		7:
+			return _turno_noche_layout()
 		_:
 			return _intro_layout()
 
@@ -136,6 +138,42 @@ static func _barrio_layout() -> Dictionary:
 			{"type": "delivery",    "pos": Vector3(2.0,  0.5, 7.5), "delivery_time": 0.8},
 			{"type": "trash",       "pos": Vector3(-5.0, 0.5, 7.5)},
 			{"type": "recipe_book", "pos": Vector3(8.0,  0.5, 7.5)},
+		],
+	}
+
+
+static func _turno_noche_layout() -> Dictionary:
+	# Restriccion: 1 sola batidora (cuello de botella), 2 hornos, 3 decoradoras
+	# Objetivo: mantener la batidora siempre activa y gestionar la cadena de produccion
+	# Contexto: pasteleria grande en turno de noche — el equipo sobra, solo la batidora limita
+	return {
+		"name": "Turno de Noche",
+		"game_mode": "real",
+		"duration": 240.0,
+		"star_thresholds": [4, 7, 10],
+		"no_burn_for_3_stars": true,
+		"coop_mode": true,
+		"queue_mode": true,
+		"spawn": Vector3(-4.0, 1.0, 5.0),
+		"spawn_p2": Vector3(4.0, 1.0, 5.0),
+		"stations": [
+			# Ingredientes — izquierda (los dos que necesita la batidora)
+			{"type": "ingredient", "ingredient": "flour", "pos": Vector3(-11.0, 0.5, -7.0), "pickup_time": 0.6, "mesh_scale": 0.72},
+			{"type": "ingredient", "ingredient": "egg",   "pos": Vector3(-11.0, 0.5, -2.0), "pickup_time": 0.6, "mesh_scale": 0.78},
+			# Batidora — centro-izquierda: EL CUELLO DE BOTELLA
+			{"type": "mix", "pos": Vector3(-4.0, 0.5, -7.0), "mix_time": 3.0},
+			# Dos hornos — para que no sean el problema
+			{"type": "cook", "pos": Vector3(2.5, 0.5, -7.5), "cook_time": 5.0, "burn_time": 11.0},
+			{"type": "cook", "pos": Vector3(2.5, 0.5, -2.0), "cook_time": 5.0, "burn_time": 11.0},
+			# Tres decoradoras — una por cada tipo de pastel
+			{"type": "decorate", "decoration": "vanilla",    "pos": Vector3(10.0, 0.5, -7.0), "decoration_time": 2.5},
+			{"type": "decorate", "decoration": "chocolate",  "pos": Vector3(10.0, 0.5, -2.5), "decoration_time": 2.5},
+			{"type": "decorate", "decoration": "strawberry", "pos": Vector3(10.0, 0.5,  2.5), "decoration_time": 2.5},
+			# Frente — dos ventanas de entrega para no perder tiempo esperando
+			{"type": "delivery",    "pos": Vector3(-2.5, 0.5, 7.5), "delivery_time": 0.8},
+			{"type": "delivery",    "pos": Vector3( 4.0, 0.5, 7.5), "delivery_time": 0.8},
+			{"type": "trash",       "pos": Vector3(-8.0, 0.5, 7.5)},
+			{"type": "recipe_book", "pos": Vector3( 9.5, 0.5, 7.5)},
 		],
 	}
 

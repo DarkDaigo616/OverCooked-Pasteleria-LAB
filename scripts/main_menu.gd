@@ -18,6 +18,10 @@ var _carousel_content: Control = null
 var _carousel_dot_labels: Array = []
 var _carousel_timer: Timer = null
 var _dev_button: Button = null
+var _clear_progress_button: Button = null
+var _selected_category: String = "intro"
+var _category_buttons: Array[Button] = []
+var _level_button_ids: Array[int] = []
 
 
 func _ready() -> void:
@@ -28,6 +32,7 @@ func _ready() -> void:
 	_build_level_buttons()
 	play_button.pressed.connect(_on_play_pressed)
 	quit_button.pressed.connect(_on_quit_pressed)
+	_highlight_category_tabs()
 	_highlight_selection()
 	_start_carousel()
 
@@ -383,26 +388,28 @@ func _build_controls_panel() -> Control:
 	panel.add_child(margin)
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 14)
+	vbox.add_theme_constant_override("separation", 10)
 	margin.add_child(vbox)
 
 	var heading := Label.new()
 	heading.text = "Seleccion de nivel"
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	heading.custom_minimum_size = Vector2(0, 36)
+	heading.custom_minimum_size = Vector2(0, 30)
 	heading.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	UITheme.apply_label(heading, 20, UITheme.COLOR_INK)
+	UITheme.apply_label(heading, 18, UITheme.COLOR_INK)
 	vbox.add_child(heading)
 
+	_build_category_tabs(vbox)
+
 	level_list = VBoxContainer.new()
-	level_list.add_theme_constant_override("separation", 8)
+	level_list.add_theme_constant_override("separation", 6)
 	level_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_child(level_list)
 
 	play_button = Button.new()
 	play_button.text = "Jugar"
 	play_button.icon = UITheme.texture(UITheme.ICON_PLAY)
-	play_button.custom_minimum_size = Vector2(0, 64)
+	play_button.custom_minimum_size = Vector2(0, 60)
 	play_button.expand_icon = true
 	play_button.add_theme_constant_override("icon_max_width", 30)
 	UITheme.apply_button(play_button, UITheme.COLOR_GREEN, Color(0.2, 0.82, 0.5), Color(0.12, 0.55, 0.3))
@@ -412,40 +419,67 @@ func _build_controls_panel() -> Control:
 	quit_button = Button.new()
 	quit_button.text = "Salir"
 	quit_button.icon = UITheme.texture(UITheme.ICON_CLOSE)
-	quit_button.custom_minimum_size = Vector2(0, 52)
+	quit_button.custom_minimum_size = Vector2(0, 48)
 	quit_button.add_theme_constant_override("icon_max_width", 24)
 	UITheme.apply_button(quit_button, Color(0.48, 0.5, 0.6), Color(0.6, 0.62, 0.72), Color(0.32, 0.34, 0.42))
 	_connect_button_sounds(quit_button)
 	vbox.add_child(quit_button)
 
+	var dev_row := HBoxContainer.new()
+	dev_row.add_theme_constant_override("separation", 6)
+	vbox.add_child(dev_row)
+
 	_dev_button = Button.new()
 	_dev_button.text = "Dev: OFF"
-	_dev_button.custom_minimum_size = Vector2(0, 38)
+	_dev_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_dev_button.custom_minimum_size = Vector2(0, 34)
 	UITheme.apply_button(_dev_button, Color(0.42, 0.28, 0.52), Color(0.56, 0.38, 0.68), Color(0.30, 0.16, 0.40))
 	_connect_button_sounds(_dev_button)
 	_dev_button.pressed.connect(_toggle_dev_mode)
-	vbox.add_child(_dev_button)
+	dev_row.add_child(_dev_button)
+
+	_clear_progress_button = Button.new()
+	_clear_progress_button.text = "Borrar prog."
+	_clear_progress_button.custom_minimum_size = Vector2(0, 34)
+	_clear_progress_button.visible = false
+	UITheme.apply_button(_clear_progress_button, Color(0.72, 0.18, 0.18), Color(0.84, 0.28, 0.28), Color(0.52, 0.10, 0.10))
+	_connect_button_sounds(_clear_progress_button)
+	_clear_progress_button.pressed.connect(_on_clear_progress_pressed)
+	dev_row.add_child(_clear_progress_button)
 
 	return panel
+
+
+func _build_category_tabs(vbox: VBoxContainer) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	vbox.add_child(row)
+
+	_category_buttons.clear()
+	for cat: Dictionary in LevelRegistry.get_categories():
+		var btn := Button.new()
+		btn.text = cat["label"]
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.custom_minimum_size = Vector2(0, 30)
+		btn.toggle_mode = true
+		_connect_button_sounds(btn)
+		var cat_id: String = cat["id"]
+		btn.pressed.connect(func(): _select_category(cat_id))
+		row.add_child(btn)
+		_category_buttons.append(btn)
 
 
 func _build_level_buttons() -> void:
 	for child in level_list.get_children():
 		child.queue_free()
 	_level_buttons.clear()
+	_level_button_ids.clear()
 
-	var prev_mode := ""
-	for i in range(1, LevelLayouts.get_level_count() + 1):
-		var layout := LevelLayouts.get_layout(i)
-		var game_mode: String = layout.get("game_mode", "tutorial")
-		var unlocked: bool = GameState.is_level_unlocked(i)
-		var stars: int = GameState.get_level_stars(i)
-
-		if i == 1:
-			level_list.add_child(_make_section_header("INTRODUCCION", Color(0.26, 0.48, 0.70)))
-		elif game_mode == "real" and prev_mode != "real":
-			level_list.add_child(_make_section_header("EL JUEGO", Color(0.68, 0.18, 0.18)))
-		prev_mode = game_mode
+	for lvl: Dictionary in LevelRegistry.get_levels_in_category(_selected_category):
+		var id: int = lvl["id"]
+		var playable: bool = GameState.is_level_playable(id)
+		var real_unlocked: bool = GameState.is_level_unlocked_real(id)
+		var stars: int = GameState.get_level_stars(id)
 
 		var star_str := ""
 		for s in range(3):
@@ -453,39 +487,61 @@ func _build_level_buttons() -> void:
 
 		var btn := Button.new()
 		btn.toggle_mode = true
-		btn.custom_minimum_size = Vector2(0, 58)
+		btn.custom_minimum_size = Vector2(0, 52)
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.add_theme_constant_override("icon_max_width", 26)
+		btn.add_theme_constant_override("icon_max_width", 24)
 
-		if not unlocked:
-			btn.text = "Nivel %d  -  %s" % [i, layout.get("name", "Nivel")]
+		if not playable:
+			btn.text = "%s  🔒" % lvl["name"]
 			btn.disabled = true
 			UITheme.apply_button(btn, Color(0.62, 0.62, 0.62, 0.45), Color(0.70, 0.70, 0.70, 0.5), Color(0.50, 0.50, 0.50, 0.4), Color(0.5, 0.5, 0.5, 0.6))
+		elif not real_unlocked:
+			# Accesible solo por dev mode — muestra indicador sutil
+			btn.icon = UITheme.texture(UITheme.ICON_STAR)
+			btn.text = "%s  [DEV]" % lvl["name"]
+			UITheme.apply_button(btn, Color(0.46, 0.30, 0.56), Color(0.58, 0.40, 0.68), Color(0.32, 0.18, 0.42))
 		else:
 			btn.icon = UITheme.texture(UITheme.ICON_STAR)
-			if stars > 0:
-				btn.text = "Nivel %d  -  %s  %s" % [i, layout.get("name", "Nivel"), star_str]
-			else:
-				btn.text = "Nivel %d  -  %s" % [i, layout.get("name", "Nivel")]
-			UITheme.apply_button(btn, Color(0.96, 0.76, 0.28), Color(1.0, 0.84, 0.35), Color(0.84, 0.58, 0.18), UITheme.COLOR_INK)
+			btn.text = "%s  %s" % [lvl["name"], star_str] if stars > 0 else lvl["name"]
+			UITheme.apply_button(btn, Color(0.88, 0.9, 0.98), Color(0.96, 0.96, 1.0), Color(0.72, 0.74, 0.85), UITheme.COLOR_INK)
 
 		_connect_button_sounds(btn)
-		var level_id := i
+		var level_id: int = id
 		btn.pressed.connect(func(): _select_level(level_id))
 		btn.gui_input.connect(func(event: InputEvent): _on_level_button_gui_input(event, level_id))
 		level_list.add_child(btn)
 		_level_buttons.append(btn)
+		_level_button_ids.append(id)
 
 
-func _make_section_header(text: String, color: Color) -> MarginContainer:
-	var wrapper := MarginContainer.new()
-	wrapper.add_theme_constant_override("margin_top", 4)
-	var lbl := Label.new()
-	lbl.text = text
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	UITheme.apply_label(lbl, 12, color, 1)
-	wrapper.add_child(lbl)
-	return wrapper
+func _select_category(cat_id: String) -> void:
+	_selected_category = cat_id
+	_build_level_buttons()
+	_highlight_category_tabs()
+	# Si el nivel seleccionado no pertenece a esta categoria, elegir el primero jugable
+	var current_lvl := LevelRegistry.get_level(_selected_level)
+	if current_lvl.get("category", "") != cat_id:
+		for lvl: Dictionary in LevelRegistry.get_levels_in_category(cat_id):
+			if GameState.is_level_playable(lvl["id"]):
+				_selected_level = lvl["id"]
+				break
+	_highlight_selection()
+
+
+func _highlight_category_tabs() -> void:
+	var cats := LevelRegistry.get_categories()
+	for i in range(_category_buttons.size()):
+		if i >= cats.size():
+			break
+		var btn := _category_buttons[i]
+		var cat: Dictionary = cats[i]
+		var active: bool = cat["id"] == _selected_category
+		btn.button_pressed = active
+		if active:
+			var c: Color = cat["color"]
+			UITheme.apply_button(btn, c, c.lightened(0.12), c.darkened(0.2), Color.WHITE)
+		else:
+			UITheme.apply_button(btn, Color(0.78, 0.80, 0.88), Color(0.88, 0.88, 0.96), Color(0.60, 0.62, 0.72), UITheme.COLOR_INK)
 
 
 func _connect_button_sounds(button: Button) -> void:
@@ -500,7 +556,7 @@ func _play_sound(player: AudioStreamPlayer) -> void:
 
 
 func _select_level(level_id: int) -> void:
-	if not GameState.is_level_unlocked(level_id):
+	if not GameState.is_level_playable(level_id):
 		return
 	_selected_level = level_id
 	_highlight_selection()
@@ -510,7 +566,7 @@ func _on_level_button_gui_input(event: InputEvent, level_id: int) -> void:
 	if event is InputEventMouseButton:
 		var mouse_event := event as InputEventMouseButton
 		if mouse_event.button_index == MOUSE_BUTTON_LEFT and mouse_event.double_click:
-			if not GameState.is_level_unlocked(level_id):
+			if not GameState.is_level_playable(level_id):
 				return
 			_selected_level = level_id
 			_play_sound(_click_player)
@@ -522,12 +578,16 @@ func _highlight_selection() -> void:
 		var btn := _level_buttons[i]
 		if btn.disabled:
 			continue
-		var selected := (i + 1) == _selected_level
+		var lvl_id: int = _level_button_ids[i]
+		var selected := lvl_id == _selected_level
+		var real_unlocked := GameState.is_level_unlocked_real(lvl_id)
 		btn.button_pressed = selected
 		if selected:
 			UITheme.apply_button(btn, UITheme.COLOR_YELLOW, Color(1.0, 0.82, 0.28), Color(0.86, 0.56, 0.1), UITheme.COLOR_INK)
-		else:
+		elif real_unlocked:
 			UITheme.apply_button(btn, Color(0.88, 0.9, 0.98), Color(0.96, 0.96, 1.0), Color(0.72, 0.74, 0.85), UITheme.COLOR_INK)
+		else:
+			UITheme.apply_button(btn, Color(0.46, 0.30, 0.56), Color(0.58, 0.40, 0.68), Color(0.32, 0.18, 0.42))
 
 
 func _toggle_dev_mode() -> void:
@@ -539,14 +599,24 @@ func _toggle_dev_mode() -> void:
 		else:
 			_dev_button.text = "Dev: OFF"
 			UITheme.apply_button(_dev_button, Color(0.42, 0.28, 0.52), Color(0.56, 0.38, 0.68), Color(0.30, 0.16, 0.40))
-	if not GameState.is_level_unlocked(_selected_level):
+	if _clear_progress_button:
+		_clear_progress_button.visible = GameState.dev_mode
+	if not GameState.is_level_playable(_selected_level):
 		_selected_level = 1
+		_selected_category = "intro"
+	_build_level_buttons()
+	_highlight_category_tabs()
+	_highlight_selection()
+
+
+func _on_clear_progress_pressed() -> void:
+	GameState.clear_progress()
 	_build_level_buttons()
 	_highlight_selection()
 
 
 func _on_play_pressed() -> void:
-	if GameState.is_level_unlocked(_selected_level):
+	if GameState.is_level_playable(_selected_level):
 		GameState.start_level(_selected_level)
 
 

@@ -53,6 +53,11 @@ const RECIPE_BOOK_DATA := {
 		{"image": "res://assets/ui/pastel_chocolate.png", "is_new": false},
 		{"image": "res://assets/ui/pastel_fresa.png", "is_new": false},
 	],
+	7: [
+		{"image": "res://assets/ui/pastel_vainilla.png", "is_new": false},
+		{"image": "res://assets/ui/pastel_chocolate.png", "is_new": false},
+		{"image": "res://assets/ui/pastel_fresa.png", "is_new": false},
+	],
 }
 
 const ORDER_NAME_FONT := 22
