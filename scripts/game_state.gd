@@ -15,7 +15,7 @@ func _ready() -> void:
 
 func start_level(level_id: int) -> void:
 	get_tree().paused = false
-	selected_level = clampi(level_id, 1, LevelLayouts.get_level_count())
+	selected_level = clampi(level_id, 1, LevelRegistry.get_levels().size())
 	get_tree().change_scene_to_file(LEVEL_SCENE)
 
 
@@ -29,15 +29,32 @@ func get_level_stars(level_id: int) -> int:
 
 
 func save_level_result(level_id: int, stars: int) -> void:
+	if dev_mode:
+		return
 	if stars > get_level_stars(level_id):
 		level_stars[level_id] = stars
 		save_progress()
 
 
+func is_level_unlocked_real(level_id: int) -> bool:
+	var entry := LevelRegistry.get_level(level_id)
+	if entry.is_empty():
+		return false
+	var unlock_after: int = entry.get("unlock_after", 0)
+	return unlock_after == 0 or get_level_stars(unlock_after) >= 1
+
+
+func is_level_playable(level_id: int) -> bool:
+	return dev_mode or is_level_unlocked_real(level_id)
+
+
 func is_level_unlocked(level_id: int) -> bool:
-	if dev_mode or level_id <= 1:
-		return true
-	return get_level_stars(level_id - 1) >= 1
+	return is_level_playable(level_id)
+
+
+func clear_progress() -> void:
+	level_stars.clear()
+	save_progress()
 
 
 func save_progress() -> void:
