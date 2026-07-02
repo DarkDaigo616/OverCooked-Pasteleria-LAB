@@ -7,6 +7,9 @@ signal item_burned
 @export var burn_time: float = 999.0
 @export var auto_cook: bool = true
 @export_range(0.0, 1.0, 0.05) var progress_loss_on_remove: float = 0.2
+# Multiplicador temporal del tiempo de quemado (evento "horno sobrecalentado":
+# lo baja para que los pasteles se quemen antes). 1.0 = normal.
+var burn_time_scale: float = 1.0
 
 var cooking_timer: float = 0.0
 var is_cooking: bool = false
@@ -60,9 +63,9 @@ func _process(delta: float) -> void:
 			if item.has_meta("ingredient_type"):
 				ItemVisuals.apply_ingredient_visual(item, item.get_meta("ingredient_type"), "cooked", 0.35)
 
-	if cooking_timer >= cook_time + burn_time and not is_burned:
+	if cooking_timer >= cook_time + _effective_burn_time() and not is_burned:
 		item.set_meta("state", "burned")
-		item.set_meta(COOKING_PROGRESS_META, cook_time + burn_time)
+		item.set_meta(COOKING_PROGRESS_META, cook_time + _effective_burn_time())
 		is_burned = true
 		is_cooking = false
 		is_processing = false
@@ -85,7 +88,7 @@ func _update_cook_bar() -> void:
 		var ratio := cooking_timer / cook_time
 		_progress_bar.set_progress(ratio, Color(1.0, 0.62, 0.18))
 	elif burn_time < 900.0 and not is_burned:
-		var burn_ratio := (cooking_timer - cook_time) / maxf(burn_time, 0.1)
+		var burn_ratio := (cooking_timer - cook_time) / maxf(_effective_burn_time(), 0.1)
 		_progress_bar.set_progress(burn_ratio, Color(0.9, 0.12, 0.08))
 	else:
 		_progress_bar.show_complete_check(true)
@@ -93,6 +96,8 @@ func _update_cook_bar() -> void:
 
 func interact(player: ChefPlayer) -> void:
 	super.interact(player)
+	if not _check_available():
+		return
 	var held := player.get_held_item()
 
 	if held:
@@ -155,6 +160,10 @@ func place_item(item: Node3D) -> bool:
 	if result and auto_cook:
 		start_cooking()
 	return result
+
+
+func _effective_burn_time() -> float:
+	return burn_time * burn_time_scale
 
 
 func _get_saved_progress(item: Node3D) -> float:

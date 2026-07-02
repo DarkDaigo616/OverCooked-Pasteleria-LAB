@@ -22,6 +22,9 @@ const PLAN_CHANGE_PENALTY_SECONDS := 2.0
 
 var player_id: int = 1
 var player_color: Color = Color(1.0, 0.55, 0.65)
+# Multiplicador de velocidad temporal (eventos: derrame en el piso, etc.).
+# 1.0 = normal; los eventos lo bajan mientras estan activos.
+var speed_scale: float = 1.0
 var show_player_indicator: bool = false
 var is_active_player: bool = true
 var held_item: Node3D = null
@@ -360,8 +363,9 @@ func handle_movement(delta: float) -> void:
 
 	if _has_move_target and distance > click_stop_distance:
 		var direction := to_target / distance
-		velocity.x = move_toward(velocity.x, direction.x * speed, acceleration * delta)
-		velocity.z = move_toward(velocity.z, direction.z * speed, acceleration * delta)
+		var eff_speed := speed * speed_scale
+		velocity.x = move_toward(velocity.x, direction.x * eff_speed, acceleration * delta)
+		velocity.z = move_toward(velocity.z, direction.z * eff_speed, acceleration * delta)
 	else:
 		if _advance_path_point():
 			handle_movement(delta)
