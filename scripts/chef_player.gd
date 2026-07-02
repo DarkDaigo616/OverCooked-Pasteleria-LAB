@@ -1,7 +1,16 @@
 extends CharacterBody3D
 class_name ChefPlayer
 
-const CHEF_MODEL_PATH := "res://assets/{models,textures,sounds}/KayKit_Restaurant_Bits_1.0_FREE/Assets/fbx/Chef.fbx"
+# Modelo riggeado (Mixamo, 41 huesos): trae malla + esqueleto + anim de caminar.
+# De CHEF_RUN_PATH solo se extrae la animacion de correr (mismo esqueleto).
+# El GLB estatico (sin esqueleto) queda como respaldo por si se quiere volver a el.
+const CHEF_MODEL_PATH := "res://assets/{models,textures,sounds}/Tripo3D/Walking.fbx"
+const CHEF_RUN_PATH := "res://assets/{models,textures,sounds}/Tripo3D/Running.fbx"
+const CHEF_IDLE_PATH := "res://assets/{models,textures,sounds}/Tripo3D/Standing Idle.fbx"
+const CHEF_STATIC_GLB := "res://assets/{models,textures,sounds}/Tripo3D/chef character 3d model.glb"
+const ANIM_WALK := "walk"
+const ANIM_RUN := "run"
+const ANIM_IDLE := "idle"
 const HELD_BASE_SCALE_META := "_held_base_scale"
 
 @export var speed: float = 5.0
@@ -10,12 +19,17 @@ const HELD_BASE_SCALE_META := "_held_base_scale"
 @export var interact_range: float = 2.8
 @export var click_stop_distance: float = 0.15
 @export var floor_y: float = 1.0
-@export var chef_model_scale: float = 0.42
-@export var chef_model_y_offset: float = 0.0
+# Modelo Tripo3D: nativo mide 1.0 de alto con el pivote CENTRADO (pies en -0.5).
+# - chef_model_scale: tamaño del chef.
+# - chef_model_y_offset: sube/baja el modelo. Si flota, bajalo; si se hunde, subelo.
+# - model_yaw_offset_deg: hacia donde "mira" el modelo. El frente del modelo Tripo
+#   esta a 90° del KayKit; si mira al lado contrario, usa 270 en vez de 90.
+@export var chef_model_scale: float = 2.6
+@export var chef_model_y_offset: float = 0.5
 @export var model_yaw_offset_deg: float = 180.0
 @export var navigation_grid_size: float = 1.0
 @export var navigation_clearance: float = 0.65
-@export var held_item_scale_multiplier: float = 1.85
+@export var held_item_scale_multiplier: float = 1.35
 
 const MAX_QUEUE_SIZE := 3
 const PLAN_CHANGE_PENALTY_SECONDS := 2.0
@@ -29,6 +43,8 @@ var show_player_indicator: bool = false
 var is_active_player: bool = true
 var held_item: Node3D = null
 var movement_enabled: bool = true
+var _anim_player: AnimationPlayer = null
+var _locomotion_state: String = ""
 var queue_mode_enabled: bool = false
 var _action_queue: Array = []
 var _queue_penalty_remaining: float = 0.0
@@ -104,14 +120,132 @@ func _setup_chef_model() -> void:
 	model.add_child(avatar)
 	model.move_child(avatar, 0)
 
+	_setup_animations(avatar)
+
 	if hand_position == null or not is_instance_valid(hand_position):
 		hand_position = Node3D.new()
 		hand_position.name = "HandPosition"
 		model.add_child(hand_position)
 
-	hand_position.position = Vector3(0.55, 1.08, 0.42)
+	# Mano por delante y hacia abajo para que el objeto se vea separado del cuerpo
+	# (no pegado al pecho). Ajusta si el objeto queda muy lejos o atravesando.
+	hand_position.position = Vector3(0.3, 0.95, 0.95)
 	if show_player_indicator:
 		_add_player_color_ring()
+
+
+## Combina las animaciones de caminar (del propio FBX) y correr (de Running.fbx)
+## en un solo AnimationPlayer, ambas en bucle y "en el sitio" (sin root motion,
+## que la moveria el codigo). Deja el chef en idle.
+func _setup_animations(avatar: Node3D) -> void:
+	_anim_player = avatar.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	if _anim_player == null:
+		return  # modelo sin animaciones (p. ej. el GLB estatico) — se queda quieto
+
+	var root_bone := _get_root_bone_name(avatar)
+	var lib := AnimationLibrary.new()
+
+	# Animacion de caminar: viene en el FBX base como "mixamo_com".
+	var walk := _extract_first_animation(_anim_player, root_bone)
+	if walk != null:
+		lib.add_animation(ANIM_WALK, walk)
+
+	# Animacion de correr: se toma de Running.fbx (mismo esqueleto de 41 huesos).
+	var run := _load_animation_from(CHEF_RUN_PATH, root_bone)
+	if run != null:
+		lib.add_animation(ANIM_RUN, run)
+
+	# Animacion de idle: de Standing Idle.fbx (mismo esqueleto).
+	var idle := _load_animation_from(CHEF_IDLE_PATH, root_bone)
+	if idle != null:
+		lib.add_animation(ANIM_IDLE, idle)
+
+	# Reemplazar las librerias importadas por la nuestra ("" = sin prefijo).
+	for lib_name in _anim_player.get_animation_library_list():
+		_anim_player.remove_animation_library(lib_name)
+	_anim_player.add_animation_library("", lib)
+
+
+func _get_root_bone_name(avatar: Node3D) -> String:
+	var sk := avatar.find_child("Skeleton3D", true, false) as Skeleton3D
+	if sk == null:
+		return ""
+	for b in range(sk.get_bone_count()):
+		if sk.get_bone_parent(b) == -1:
+			return sk.get_bone_name(b)
+	return ""
+
+
+func _extract_first_animation(ap: AnimationPlayer, root_bone: String) -> Animation:
+	var list := ap.get_animation_list()
+	if list.is_empty():
+		return null
+	var anim := ap.get_animation(list[0])
+	if anim == null:
+		return null
+	return _prepare_loop_animation(anim.duplicate(true), root_bone)
+
+
+func _load_animation_from(path: String, root_bone: String) -> Animation:
+	if not ResourceLoader.exists(path):
+		return null
+	var packed := load(path) as PackedScene
+	if packed == null:
+		return null
+	var scene := packed.instantiate()
+	var ap := scene.find_child("AnimationPlayer", true, false) as AnimationPlayer
+	var result: Animation = null
+	if ap != null:
+		result = _extract_first_animation(ap, root_bone)
+	scene.free()
+	return result
+
+
+## Pone la animacion en bucle y elimina SOLO la pista de posicion del hueso raiz
+## (la cadera) para matar el "root motion": el desplazamiento lo controla el
+## CharacterBody, no la animacion. El resto de pistas de posicion se conservan;
+## si se quitan todas, el esqueleto colapsa al origen y la malla se vuelve
+## invisible (las animaciones de Mixamo traen posicion por hueso).
+func _prepare_loop_animation(anim: Animation, root_bone: String) -> Animation:
+	anim.loop_mode = Animation.LOOP_LINEAR
+	if root_bone.is_empty():
+		return anim
+	for i in range(anim.get_track_count() - 1, -1, -1):
+		if anim.track_get_type(i) != Animation.TYPE_POSITION_3D:
+			continue
+		if String(anim.track_get_path(i)).ends_with(":" + root_bone):
+			anim.remove_track(i)
+	return anim
+
+
+## Elige la animacion segun la velocidad horizontal: quieto = idle (pose fija),
+## lento (ralentizado por un evento) = caminar, normal = correr.
+func _update_locomotion_anim() -> void:
+	if _anim_player == null:
+		return
+	var hspeed := Vector2(velocity.x, velocity.z).length()
+	var state := ""
+	if hspeed < 0.35:
+		state = "idle"
+	elif hspeed < speed * 0.7:
+		state = ANIM_WALK
+	else:
+		state = ANIM_RUN
+
+	if state == _locomotion_state:
+		return
+	_locomotion_state = state
+
+	if state == "idle":
+		# Idle real si existe; si no, congelar el primer frame de caminar.
+		if _anim_player.has_animation(ANIM_IDLE):
+			_anim_player.play(ANIM_IDLE)
+		elif _anim_player.has_animation(ANIM_WALK):
+			_anim_player.play(ANIM_WALK)
+			_anim_player.seek(0.0, true)
+			_anim_player.pause()
+	elif _anim_player.has_animation(state):
+		_anim_player.play(state)
 
 
 func configure_level_bounds(half_size: float, spawn: Vector3) -> void:
@@ -133,6 +267,7 @@ func configure_navigation_obstacles(obstacles: Array[Rect2]) -> void:
 func _physics_process(delta: float) -> void:
 	if not movement_enabled:
 		velocity = Vector3.ZERO
+		_update_locomotion_anim()
 		return
 	if _queue_penalty_remaining > 0.0:
 		_queue_penalty_remaining -= delta
@@ -141,6 +276,7 @@ func _physics_process(delta: float) -> void:
 		_refresh_hover_target()
 		move_and_slide()
 		_enforce_safe_position()
+		_update_locomotion_anim()
 		return
 	_refresh_hover_target()
 	_refresh_nearby_interactables()
@@ -149,6 +285,7 @@ func _physics_process(delta: float) -> void:
 	handle_rotation(delta)
 	move_and_slide()
 	_enforce_safe_position()
+	_update_locomotion_anim()
 
 
 func _input(event: InputEvent) -> void:
@@ -833,7 +970,10 @@ func _add_player_color_ring() -> void:
 	mat.emission_enabled = true
 	mat.emission = player_color * 0.4
 	ring.material_override = mat
-	ring.position = Vector3(0, 1.55, 0)
+	# Colocar por ENCIMA de la cabeza del modelo (que crece con la escala), si no
+	# el anillo queda oculto dentro del cuerpo. Coef. 0.85 medido para el rig FBX.
+	var head_top := chef_model_y_offset + chef_model_scale * 0.85
+	ring.position = Vector3(0, head_top + 0.3, 0)
 	model.add_child(ring)
 
 	var existing_lbl := model.find_child("PlayerLabel", false, false)
@@ -847,7 +987,7 @@ func _add_player_color_ring() -> void:
 	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	lbl.no_depth_test = true
 	lbl.render_priority = 6
-	lbl.position = Vector3(0, 2.1, 0)
+	lbl.position = Vector3(0, head_top + 0.8, 0)
 	lbl.outline_size = 6
 	lbl.outline_modulate = Color(0.05, 0.05, 0.05, 0.9)
 	model.add_child(lbl)

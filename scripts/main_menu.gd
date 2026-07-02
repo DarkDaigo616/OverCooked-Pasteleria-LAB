@@ -511,7 +511,7 @@ func _build_level_buttons() -> void:
 		btn.gui_input.connect(func(event: InputEvent): _on_level_button_gui_input(event, level_id))
 		level_list.add_child(btn)
 		_level_buttons.append(btn)
-		_level_button_ids.append(id)
+		_level_button_ids.append(id)	
 
 
 func _select_category(cat_id: String) -> void:
