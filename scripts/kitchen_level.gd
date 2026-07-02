@@ -96,6 +96,7 @@ func _ready() -> void:
 			_setup_coop_mode(layout)
 	if layout.get("game_mode", "") == "real":
 		_setup_real_game_mode(layout)
+	_setup_events()
 	if level_label:
 		level_label.text = "Nivel %d: %s" % [level_id, layout.get("name", "")]
 	if camera:
@@ -555,3 +556,24 @@ func _on_cake_burned() -> void:
 	var hud := _get_hud() as GameHUD
 	if hud:
 		hud.register_burn()
+
+
+func _setup_events() -> void:
+	# Los eventos caoticos (Etapa 9) son opt-in por nivel via LevelRegistry.
+	# El EventManager solo decide cuando disparar; la logica vive en cada evento.
+	var cfg := LevelRegistry.get_events_config(GameState.selected_level)
+	if cfg.is_empty() or not cfg.get("enabled", false):
+		return
+	var order_mgr := get_tree().get_first_node_in_group("order_manager") as OrderManager
+	var hud := _get_hud()
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var ctx := EventContext.new(self, order_mgr, hud, stations_root, rng)
+	var pool := EventLibrary.create_pool(cfg.get("pool", []))
+	var manager := EventManager.new()
+	manager.name = "EventManager"
+	add_child(manager)
+	manager.setup(ctx, pool, cfg)
+	# Al terminar el nivel, cortar eventos y revertir sus efectos.
+	if hud and hud.has_signal("game_ended"):
+		hud.connect("game_ended", func(_score: int) -> void: manager.stop())

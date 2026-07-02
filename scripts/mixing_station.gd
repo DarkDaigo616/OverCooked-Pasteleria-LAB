@@ -19,6 +19,9 @@ func _ready() -> void:
 func interact(player: ChefPlayer) -> void:
 	super.interact(player)
 
+	if not _check_available():
+		return
+
 	if is_processing:
 		_show_station_message("Batidora ocupada.", false)
 		return

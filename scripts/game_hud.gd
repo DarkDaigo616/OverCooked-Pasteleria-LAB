@@ -27,38 +27,6 @@ signal game_ended(final_score: int)
 
 const HINT_DEFAULT := "Click en una estacion u objeto"
 const DELIVERY_FEEDBACK_DURATION := 3.5
-const RECIPE_BOOK_DATA := {
-	1: [
-		{"image": "res://assets/ui/pastel_horneado.png", "is_new": false},
-	],
-	2: [
-		{"image": "res://assets/ui/pastel_vainilla.png", "is_new": true},
-	],
-	3: [
-		{"image": "res://assets/ui/pastel_simple.png", "is_new": false},
-		{"image": "res://assets/ui/pastel_chocolate.png", "is_new": true},
-		{"image": "res://assets/ui/pastel_fresa.png", "is_new": true},
-	],
-	4: [
-		{"image": "res://assets/ui/pastel_chocolate.png", "is_new": false},
-		{"image": "res://assets/ui/pastel_fresa.png", "is_new": false},
-	],
-	5: [
-		{"image": "res://assets/ui/pastel_simple.png", "is_new": false},
-		{"image": "res://assets/ui/pastel_chocolate.png", "is_new": false},
-		{"image": "res://assets/ui/pastel_fresa.png", "is_new": false},
-	],
-	6: [
-		{"image": "res://assets/ui/pastel_vainilla.png", "is_new": false},
-		{"image": "res://assets/ui/pastel_chocolate.png", "is_new": false},
-		{"image": "res://assets/ui/pastel_fresa.png", "is_new": false},
-	],
-	7: [
-		{"image": "res://assets/ui/pastel_vainilla.png", "is_new": false},
-		{"image": "res://assets/ui/pastel_chocolate.png", "is_new": false},
-		{"image": "res://assets/ui/pastel_fresa.png", "is_new": false},
-	],
-}
 
 const ORDER_NAME_FONT := 22
 const ORDER_DETAIL_FONT := 16
@@ -140,6 +108,11 @@ var _delivery_counter_lbl: Label = null
 var _no_burn_lbl: Label = null
 var _end_deliveries_lbl: Label = null
 var _retry_button: Button = null
+var _event_banner: PanelContainer = null
+var _event_banner_title: Label = null
+var _event_banner_desc: Label = null
+var _event_banner_style: StyleBoxFlat = null
+var _event_banner_tween: Tween = null
 
 
 func _ready() -> void:
@@ -162,6 +135,7 @@ func _ready() -> void:
 	_build_coop_selector()
 	_build_recipe_book_overlay()
 	_build_delivery_counter()
+	_build_event_banner()
 	if menu_button:
 		menu_button.pressed.connect(_on_menu_pressed)
 	call_deferred("_sync_orders_from_manager")
@@ -563,10 +537,23 @@ func _build_recipe_book_overlay() -> void:
 
 
 func _refresh_recipe_book_content() -> void:
-	var level_id := GameState.selected_level
-	_recipe_pages = RECIPE_BOOK_DATA.get(level_id, RECIPE_BOOK_DATA[1])
+	# El recetario se deriva de las recetas del nivel (LevelRegistry) y sus
+	# imagenes (RecipeCatalog). Ya no hay una tabla hardcodeada por nivel: al
+	# agregar un nivel o cambiarle recetas, el recetario se actualiza solo.
+	_recipe_pages = _build_recipe_pages(GameState.selected_level)
 	_recipe_page_index = 0
 	_update_recipe_book_page()
+
+
+func _build_recipe_pages(level_id: int) -> Array:
+	var pages: Array = []
+	for id: String in LevelRegistry.get_level_recipe_ids(level_id):
+		var img := RecipeCatalog.book_image_path(id)
+		if not img.is_empty():
+			pages.append({"image": img, "is_new": false})
+	if pages.is_empty():
+		pages.append({"image": RecipeCatalog.book_image_path("baked"), "is_new": false})
+	return pages
 
 
 func _update_recipe_book_page() -> void:
@@ -1073,6 +1060,68 @@ func show_delivery_feedback(message: String, success: bool) -> void:
 		_delivery_feedback_active = false
 		clear_station_target()
 	)
+
+
+# ---------------------------------------------------------------------------
+# Banner de eventos caoticos (Etapa 9). El EventManager lo usa para anunciar
+# que empieza un evento; el efecto en si se siente en la cocina.
+# ---------------------------------------------------------------------------
+func _build_event_banner() -> void:
+	_event_banner = PanelContainer.new()
+	_event_banner.name = "EventBanner"
+	_event_banner.z_index = 120
+	_event_banner.visible = false
+	_event_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_event_banner.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_event_banner.offset_left = -280
+	_event_banner.offset_right = 280
+	_event_banner.offset_top = 92
+	_event_banner.offset_bottom = 168
+	_event_banner_style = UITheme.panel_style(Color(0.14, 0.09, 0.06, 0.95), Color(0.95, 0.6, 0.2), 3, 10)
+	_event_banner.add_theme_stylebox_override("panel", _event_banner_style)
+	add_child(_event_banner)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 16)
+	margin.add_theme_constant_override("margin_right", 16)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	_event_banner.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 2)
+	margin.add_child(vbox)
+
+	_event_banner_title = Label.new()
+	_event_banner_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	UITheme.apply_label(_event_banner_title, 22, Color(1.0, 0.86, 0.4), 1)
+	vbox.add_child(_event_banner_title)
+
+	_event_banner_desc = Label.new()
+	_event_banner_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_event_banner_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	UITheme.apply_label(_event_banner_desc, 15, Color(0.95, 0.92, 0.86))
+	vbox.add_child(_event_banner_desc)
+
+
+func show_event_banner(title: String, description: String, color: Color) -> void:
+	if _event_banner == null:
+		return
+	if _event_banner_title:
+		_event_banner_title.text = "⚠  " + title
+	if _event_banner_desc:
+		_event_banner_desc.text = description
+	if _event_banner_style:
+		_event_banner_style.border_color = color
+	_event_banner.visible = true
+	_event_banner.modulate = Color(1, 1, 1, 0)
+	if _event_banner_tween and _event_banner_tween.is_valid():
+		_event_banner_tween.kill()
+	_event_banner_tween = create_tween()
+	_event_banner_tween.tween_property(_event_banner, "modulate:a", 1.0, 0.2)
+	_event_banner_tween.tween_interval(4.2)
+	_event_banner_tween.tween_property(_event_banner, "modulate:a", 0.0, 0.4)
+	_event_banner_tween.tween_callback(func(): _event_banner.visible = false)
 
 
 func flash_interaction() -> void:

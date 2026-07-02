@@ -15,10 +15,15 @@ var is_occupied: bool = false
 var current_items: Array[Node3D] = []
 var is_processing: bool = false
 var process_timer: float = 0.0
+# Fuera de servicio temporal (eventos: bateria descompuesta, etc.). Generico:
+# cualquier estacion puede deshabilitarse; las que lo comprueban llaman a
+# _check_available() al inicio de su interact().
+var disabled: bool = false
 
 var _highlight_ring: MeshInstance3D
 var _station_pad: MeshInstance3D
 var _flash_tween: Tween
+var _disabled_overlay: MeshInstance3D
 
 @onready var item_holder = $ItemHolder if has_node("ItemHolder") else null
 
@@ -59,6 +64,50 @@ func interact(player: ChefPlayer) -> void:
 func set_highlighted(active: bool) -> void:
 	if _highlight_ring:
 		_highlight_ring.visible = active
+
+
+## Deshabilita/rehabilita la estacion (usado por los eventos). Muestra un
+## indicador rojo flotante mientras esta fuera de servicio.
+func set_disabled(value: bool) -> void:
+	disabled = value
+	_update_disabled_visual()
+
+
+func is_available() -> bool:
+	return not disabled
+
+
+## Las estaciones interactivas llaman esto al inicio de interact(): si estan
+## fuera de servicio, avisan al jugador y devuelven false.
+func _check_available() -> bool:
+	if not disabled:
+		return true
+	var hud := get_tree().get_first_node_in_group("game_hud")
+	if hud and hud.has_method("show_delivery_feedback"):
+		hud.show_delivery_feedback("%s fuera de servicio." % get_display_name(), false)
+	return false
+
+
+func _update_disabled_visual() -> void:
+	if disabled:
+		if _disabled_overlay == null:
+			_disabled_overlay = MeshInstance3D.new()
+			_disabled_overlay.name = "DisabledOverlay"
+			var box := BoxMesh.new()
+			box.size = Vector3(2.1, 0.14, 1.7)
+			_disabled_overlay.mesh = box
+			_disabled_overlay.position = Vector3(0, 1.55, 0)
+			var mat := StandardMaterial3D.new()
+			mat.albedo_color = Color(0.9, 0.15, 0.12, 0.55)
+			mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+			mat.emission_enabled = true
+			mat.emission = Color(0.85, 0.12, 0.08)
+			mat.emission_energy_multiplier = 0.5
+			_disabled_overlay.material_override = mat
+			add_child(_disabled_overlay)
+		_disabled_overlay.visible = true
+	elif _disabled_overlay:
+		_disabled_overlay.visible = false
 
 
 func has_ready_output() -> bool:

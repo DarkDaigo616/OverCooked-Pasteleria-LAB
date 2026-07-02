@@ -1,6 +1,6 @@
 # Overcooked Style Game - Proyecto Godot
 
-**Version:** 0.8.0
+**Version:** 0.9.0
 
 ## Descripcion
 
@@ -28,7 +28,7 @@ El menu organiza los niveles en 4 categorias:
 | Intro | 1 | Tutorial de mecanicas basicas |
 | Pasteleria | 2, 3, 4 | Recetas completas, tiempo y cola de acciones |
 | Cooperativo | 5 | Dos jugadores en la misma pantalla |
-| Desafios | 6, 7 | Niveles reales con estrellas y tiempo limite |
+| Desafios | 6, 7, 8 | Niveles reales con estrellas, tiempo limite y eventos |
 
 Los niveles de Desafios se desbloquean en orden: hay que completar el anterior para acceder al siguiente.
 
@@ -95,7 +95,7 @@ Dos jugadores en la misma pantalla. **Tecla 1** controla P1 (rosa), **Tecla 2** 
 
 ---
 
-## DESAFIOS — Niveles 6 y 7
+## DESAFIOS — Niveles 6, 7 y 8
 
 ### Nivel 6 — Pasteleria de barrio
 El primer nivel del juego real. **3 minutos**, 3 tipos de pastel, sistema de estrellas. Cooperativo.
@@ -143,6 +143,49 @@ Nivel de desafio disenado por restricciones. **4 minutos**, cooperativo, pedidos
 
 ---
 
+### Nivel 8 — Servicio caotico  _(Etapa 9)_
+Estrena el sistema de **eventos caoticos**. Cooperativo, **4 minutos**, con dos
+batidoras, dos hornos y tres decoradoras. Cada cierto tiempo salta un imprevisto
+que obliga a los jugadores a re-priorizar y coordinar.
+
+**Duracion:** 4 minutos (240s) | Eventos cada 22-34s (primero a los 20s, hasta 2 a la vez)
+
+| Pedido | Puntos | Tiempo |
+|--------|--------|--------|
+| Pastel de vainilla | 140 | 85s |
+| Pastel de chocolate | 150 | 85s |
+| Pastel con fresa | 150 | 85s |
+
+**Sistema de estrellas:**
+
+| Estrellas | Condicion |
+|-----------|-----------|
+| ★☆☆ | Entregar 4 pedidos |
+| ★★☆ | Entregar 7 pedidos |
+| ★★★ | Entregar 10 pedidos sin quemar pasteles |
+
+---
+
+## Eventos caoticos (Etapa 9)
+
+La filosofia: el caos debe nacer de **decisiones y coordinacion**, no de castigos
+al azar. Cada evento crea un conflicto de prioridades ("yo saco el pastel", "ve
+limpiando el piso", "yo termino este pedido").
+
+| Evento | Que hace | Decision que fuerza |
+|--------|----------|---------------------|
+| Horno sobrecalentado | Los pasteles se queman mucho antes | ¿Dejo mi tarea para sacar el pastel? |
+| Derrame de crema | Aparece un charco que ralentiza; se limpia parandose encima | ¿Quien va a limpiar y quien sigue cocinando? |
+| El cliente cambio de idea | Un pedido activo cambia de decoracion | ¿Re-planeamos quien termina que pastel? |
+| Batidora descompuesta | Una batidora queda fuera de servicio un rato | ¿Como compartimos la otra batidora? |
+| Pedido urgente | Aparece un pedido VIP con bonus y poco tiempo | ¿Lo priorizamos o seguimos con lo actual? |
+
+Los eventos tienen **duracion, peso (probabilidad), cooldown y prioridad**, se
+anuncian en un banner y pueden combinarse. Estan disponibles solo en los niveles
+que los activan (opt-in por nivel).
+
+---
+
 ## Cadena de preparacion
 
 ```
@@ -175,9 +218,10 @@ OvercookedGame/
 │   ├── game_manager.gd        # Coordinador principal
 │   ├── game_hud.gd            # Interfaz: pedidos, timer, puntos, colas, estrellas
 │   ├── order_manager.gd       # Pedidos, timers, bonus/penalizacion
-│   ├── recipe.gd              # Definicion de recetas
-│   ├── level_layouts.gd       # Layouts de los 7 niveles (mecanicas de cocina)
-│   ├── level_registry.gd      # Metadatos de niveles: nombre, categoria, desbloqueo (autoload)
+│   ├── recipe.gd              # Definicion de recetas (matching de ingredientes)
+│   ├── recipe_catalog.gd      # Fuente unica de recetas: nombre, ingredientes, imagen (static)
+│   ├── level_layouts.gd       # Layouts fisicos de los 8 niveles (estaciones, spawns)
+│   ├── level_registry.gd      # Fuente unica de niveles: metadatos, ordenes, eventos (autoload)
 │   ├── kitchen_level.gd       # Carga y construccion del nivel, modo real, modo coop
 │   ├── station_factory.gd     # Construccion de estaciones
 │   ├── station_base.gd        # Base para todas las estaciones
@@ -192,7 +236,19 @@ OvercookedGame/
 │   ├── station_visuals.gd     # Visuales de estaciones
 │   ├── ui_theme.gd            # Tema visual de la UI
 │   ├── game_state.gd          # Estado global: progreso, dev mode (autoload)
-│   └── physics_layers.gd      # Capas de fisica
+│   ├── physics_layers.gd      # Capas de fisica
+│   └── events/                # Sistema de eventos caoticos (Etapa 9)
+│       ├── game_event.gd      # Clase base de un evento (duracion, peso, cooldown...)
+│       ├── event_context.gd   # Fachada al mundo (ordenes, estaciones, jugadores, HUD)
+│       ├── event_manager.gd   # Planificador: SOLO decide cuando disparar
+│       ├── event_library.gd   # Registro de eventos disponibles (id -> clase)
+│       ├── cream_spill.gd     # Nodo del charco de crema
+│       └── events/            # Un archivo por evento concreto
+│           ├── oven_overheat_event.gd
+│           ├── cream_spill_event.gd
+│           ├── decoration_change_event.gd
+│           ├── mixer_breakdown_event.gd
+│           └── rush_order_event.gd
 ├── scenes/
 │   ├── main_menu.tscn
 │   ├── levels/kitchen_level.tscn
@@ -218,6 +274,26 @@ El boton **Dev: OFF** en el menu activa el modo desarrollador:
 
 ---
 
+## Como agregar contenido (arquitectura 0.9.0)
+
+La base quedo preparada para crecer sin reescribir sistemas:
+
+- **Nueva receta:** 1 entrada en `recipe_catalog.gd` (nombre, ingredientes,
+  imagen). El recetario del HUD y el matching la toman de ahi automaticamente.
+- **Nuevo nivel:** 1 entrada en `level_registry.gd` (metadatos + ordenes +
+  eventos) y 1 funcion de layout en `level_layouts.gd`. El menu, el desbloqueo,
+  las recetas y el recetario se actualizan solos.
+- **Nuevo evento:** 1 clase que hereda de `GameEvent` (con `on_start` / `on_end`
+  / `can_trigger`...) y 1 linea en `event_library.gd`. El `EventManager` no se
+  toca nunca: solo decide cuando disparar. Luego se agrega el id al `pool` del
+  nivel que lo quiera usar.
+
+Principios: fuente unica de verdad por dato, bajo acoplamiento (los eventos
+hablan con `EventContext`, no con rutas de nodos) y efectos reversibles
+(`burn_time_scale`, `set_disabled`, `speed_scale`).
+
+---
+
 ## Historial de Etapas
 
 | Version | Etapa | Descripcion |
@@ -230,6 +306,7 @@ El boton **Dev: OFF** en el menu activa el modo desarrollador:
 | 0.6.0 | Etapa 6 | Cooperativo local (Nivel 5): P1/P2 con teclas 1-2, colas independientes, menu de pausa con ESC |
 | 0.7.0 | Etapa 7 | Primer nivel real (Nivel 6 "Pasteleria de barrio"): sistema de estrellas, contador de pedidos, 3 min, reintentar |
 | 0.8.0 | Etapa 8 | Nivel 7 "Turno de Noche" (diseno por restricciones); menu por categorias (Intro/Pasteleria/Coop/Desafios); desbloqueo secuencial; dev mode separado del progreso real |
+| 0.9.0 | Etapa 9 | Sistema de eventos caoticos modular (horno, derrame, cambio de decoracion, batidora, pedido urgente) y Nivel 8 "Servicio caotico". Refactor de base: catalogo unico de recetas, definicion de nivel consolidada en LevelRegistry (ordenes/eventos), ganchos de runtime en estaciones |
 
 ---
 
