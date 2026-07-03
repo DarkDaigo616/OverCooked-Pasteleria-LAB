@@ -1039,23 +1039,37 @@ func _enqueue_action(target: Node3D) -> void:
 		return
 
 	# Station is not processing — count existing deliver entries for this target.
+	# La accion activa permanece como _action_queue[0] mientras se ejecuta, asi
+	# que ya se cuenta en el bucle. Solo se suma _pending aparte cuando es una
+	# accion directa (no encolada); si no, se contaria doble.
+	var pending_is_head: bool = (
+		not _action_queue.is_empty()
+		and _action_queue[0].get("target") == _pending_interaction_target
+		and _action_queue[0].get("action_type", "deliver") == _pending_action_type
+	)
 	var deliver_count := 0
-	if _pending_interaction_target == target and _pending_action_type == "deliver":
+	if _pending_interaction_target == target and _pending_action_type == "deliver" and not pending_is_head:
 		deliver_count += 1
 	for action in _action_queue:
 		if action.get("target") == target and action.get("action_type", "deliver") == "deliver":
 			deliver_count += 1
 
-	# A station that holds N items allows N deliver slots before one wait_pickup.
+	# La cola es un PLAN: los "llevar" planificables son los huecos LIBRES de la
+	# estacion (capacidad menos los items que ya tiene dentro). Si el plan ya la
+	# llena (p. ej. huevo entregado + harina en cola en una batidora de 2), el
+	# siguiente Shift+Click se interpreta como "Esperar", no como otro llevar.
 	var max_delivers: int = 1
 	var raw_max: Variant = target.get("max_items")
 	if raw_max is int and raw_max > 0:
 		max_delivers = raw_max
+	var raw_items: Variant = target.get("current_items")
+	if raw_items is Array:
+		max_delivers = maxi(max_delivers - (raw_items as Array).size(), 0)
 
 	var action_type: String
 	if deliver_count < max_delivers and not has_wait:
 		action_type = "deliver"
-	elif deliver_count > 0 and not has_wait:
+	elif not has_wait:
 		action_type = "wait_pickup"
 	else:
 		_show_hud_message("Ya esta en la cola", false)

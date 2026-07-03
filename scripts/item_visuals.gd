@@ -3,6 +3,21 @@ class_name ItemVisuals
 
 const BASE := "res://assets/{models,textures,sounds}/KayKit_Restaurant_Bits_1.0_FREE/Assets/gltf/"
 const TINY_TREATS_BASE := "res://assets/{models,textures,sounds}/Tiny_Treats_Bakery_Interior_1.1_FREE/Assets/gltf/"
+const TRIPO_BASE := "res://assets/{models,textures,sounds}/Tripo3D/"
+
+# Modelos 3D (Tripo) para los pasteles y la masa. Cada estado tiene su GLB; si
+# falta, se cae al visual procedural de abajo. Todos vienen normalizados a ~1.0
+# de ancho con el pivote centrado, asi que se apoyan en la superficie por codigo.
+const CAKE_MODELS := {
+	"baked": "cake horneado 3d model.glb",
+	"decorated_vanilla": "cake vanilla 3d model.glb",
+	"decorated_chocolate": "cake chocolate 3d model.glb",
+	"decorated_strawberry": "cake fresa 3d model.glb",
+	"burned": "cake quemado 3d model.glb",
+}
+const BATTER_MODEL := "cake batter 3d model.glb"
+# Factor de tamaño de los modelos de pastel (ajusta si se ven grandes/chicos).
+const CAKE_MODEL_SCALE := 0.9
 
 static func ingredient_mesh_path(ingredient_type: String, state: String) -> String:
 	match ingredient_type:
@@ -123,6 +138,45 @@ static func _apply_tiny_treat_scene_visual(root: Node3D, asset_name: String, mes
 	return true
 
 
+## Instancia un modelo GLB de Tripo bajo GeneratedVisual, escalado y apoyado en
+## la superficie (su base queda en rest_y). Devuelve true si lo coloco.
+static func _apply_tripo_model(root: Node3D, path: String, model_scale: float, rest_y: float = 0.0) -> bool:
+	if not ResourceLoader.exists(path):
+		return false
+	var scene := load(path) as PackedScene
+	if scene == null:
+		return false
+	var node := scene.instantiate() as Node3D
+	if node == null:
+		return false
+	var visual := _clear_generated_visual(root)
+	node.scale = Vector3.ONE * model_scale
+	# Apoyar la base en rest_y (los modelos tienen el pivote centrado).
+	var acc: Array = []
+	_gather_aabb(node, Transform3D.IDENTITY, acc)
+	if not acc.is_empty():
+		var local: AABB = acc[0]
+		node.position.y = rest_y - local.position.y * model_scale
+	visual.add_child(node)
+	return true
+
+
+## Acumula en acc[0] el AABB combinado de las mallas de un arbol, en el espacio
+## local del nodo raiz (sin depender de que este en el arbol de escena).
+static func _gather_aabb(node: Node, xf: Transform3D, acc: Array) -> void:
+	if node is MeshInstance3D:
+		var box: AABB = xf * (node as MeshInstance3D).get_aabb()
+		if acc.is_empty():
+			acc.append(box)
+		else:
+			acc[0] = (acc[0] as AABB).merge(box)
+	for c in node.get_children():
+		var child_xf := xf
+		if c is Node3D:
+			child_xf = xf * (c as Node3D).transform
+		_gather_aabb(c, child_xf, acc)
+
+
 static func _clear_generated_visual(root: Node3D) -> Node3D:
 	var old := root.get_node_or_null("GeneratedVisual")
 	if old:
@@ -152,6 +206,10 @@ static func _add_mesh(parent: Node3D, mesh: Mesh, pos: Vector3, scale: Vector3, 
 
 
 static func _apply_cake_batter_visual(root: Node3D, mesh_scale: float, valid_mix: bool = true) -> void:
+	# Masa correcta -> modelo 3D. La masa incorrecta (bad_batter) usa el procedural.
+	if valid_mix and _apply_tripo_model(root, TRIPO_BASE + BATTER_MODEL, mesh_scale * CAKE_MODEL_SCALE):
+		return
+
 	var visual := _clear_generated_visual(root)
 	var s := mesh_scale * 1.2
 	var batter_color := Color(0.95, 0.74, 0.32) if valid_mix else Color(0.56, 0.48, 0.38)
@@ -215,6 +273,12 @@ static func _apply_baking_ingredient_visual(root: Node3D, ingredient_type: Strin
 
 
 static func _apply_cake_visual(root: Node3D, state: String, mesh_scale: float) -> void:
+	# Estado con modelo 3D -> usarlo. ruined_baked (mezcla fallida horneada) no
+	# tiene modelo propio y usa el procedural de abajo.
+	if CAKE_MODELS.has(state):
+		if _apply_tripo_model(root, TRIPO_BASE + CAKE_MODELS[state], mesh_scale * CAKE_MODEL_SCALE):
+			return
+
 	var visual := _clear_generated_visual(root)
 	var s := mesh_scale * 1.25
 	var burned := state == "burned"

@@ -1316,12 +1316,30 @@ func create_order_card(order: Dictionary, _order_number: int = 1) -> PanelContai
 				icon_color = Color(0.92, 0.82, 0.42)
 
 	var border_col := Color(0.46, 0.72, 0.42) if not is_complex else Color(0.72, 0.50, 0.22)
+	# Resaltar pedidos afectados por eventos (Etapa 9).
+	var bg_col := Color(1.0, 0.98, 0.91, 1.0)
+	var border_w := 2
+	var badge_text := ""
+	var badge_col := Color.TRANSPARENT
+	if order.get("urgent", false):
+		border_col = Color(0.90, 0.20, 0.24)
+		bg_col = Color(1.0, 0.90, 0.90, 1.0)
+		border_w = 3
+		badge_text = "¡URGENTE!"
+		badge_col = Color(0.90, 0.20, 0.24)
+	elif order.get("changed", false):
+		border_col = Color(0.62, 0.28, 0.78)
+		bg_col = Color(0.98, 0.92, 1.0, 1.0)
+		border_w = 3
+		badge_text = "¡CAMBIO!"
+		badge_col = Color(0.62, 0.28, 0.78)
+
 	var panel := PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.custom_minimum_size = Vector2(ORDER_PANEL_WIDTH - 24, 0)
 	panel.add_theme_stylebox_override(
 		"panel",
-		UITheme.panel_style(Color(1.0, 0.98, 0.91, 1.0), border_col, 2, 8, false)
+		UITheme.panel_style(bg_col, border_col, border_w, 8, false)
 	)
 
 	var margin := MarginContainer.new()
@@ -1374,6 +1392,13 @@ func create_order_card(order: Dictionary, _order_number: int = 1) -> PanelContai
 		bonus_label.text = "+%d rapido" % int(recipe.points * 0.5)
 		_style_order_label(bonus_label, 13, Color(0.12, 0.68, 0.36))
 		pts_row.add_child(bonus_label)
+	if not badge_text.is_empty():
+		# En su propia linea (no en pts_row) para no ensanchar la tarjeta ni
+		# empujar el timer/panel.
+		var badge := Label.new()
+		badge.text = badge_text
+		_style_order_label(badge, 13, badge_col)
+		name_col.add_child(badge)
 
 	var time_label := Label.new()
 	time_label.text = format_time(order["time_remaining"])

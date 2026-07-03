@@ -220,6 +220,7 @@ func change_random_order_recipe() -> Dictionary:
 
 	var new_recipe: Recipe = options[randi() % options.size()]
 	order["recipe"] = new_recipe
+	order["changed"] = true
 	order.erase("_awarded_points")
 	all_orders_updated.emit(active_orders)
 	return {"old": old_recipe.recipe_name, "new": new_recipe.recipe_name, "order": order}
