@@ -20,13 +20,23 @@ var orders_running: bool = true
 # LevelRegistry en _ready. Antes esto era una escalera gigante de
 # "if selected_level >= N" con las recetas duplicadas nivel por nivel.
 var _config: Dictionary = {}
+# Fases progresivas (Etapa 10): el pool de recetas cambia con el tiempo del
+# nivel — permite ensenar una mecanica primero y combinarlas despues.
+# Formato: [{"at": segundos, "recipes": [...]}], ordenadas por "at".
+var _phases: Array = []
+var _phase_index: int = -1
+var _elapsed: float = 0.0
 
 
 func _ready() -> void:
 	add_to_group("order_manager")
 	_config = LevelRegistry.get_orders_config(GameState.selected_level)
 	_apply_config()
-	create_recipes()
+	_phases = _config.get("phases", [])
+	if _phases.is_empty():
+		create_recipes()
+	else:
+		_apply_phase(0)
 	var initial_count: int = _config.get("initial", 1)
 	for i in range(initial_count):
 		spawn_new_order()
@@ -46,6 +56,9 @@ func _process(delta: float) -> void:
 	if not orders_running:
 		return
 
+	_elapsed += delta
+	_advance_phases()
+
 	for i in range(active_orders.size() - 1, -1, -1):
 		var order: Dictionary = active_orders[i]
 		order["time_remaining"] -= delta
@@ -58,9 +71,29 @@ func _process(delta: float) -> void:
 		spawn_timer = 0.0
 
 
+func _advance_phases() -> void:
+	if _phases.is_empty():
+		return
+	while _phase_index + 1 < _phases.size():
+		var next: Dictionary = _phases[_phase_index + 1]
+		if _elapsed < float(next.get("at", 0.0)):
+			break
+		_apply_phase(_phase_index + 1)
+
+
+func _apply_phase(index: int) -> void:
+	_phase_index = index
+	var phase: Dictionary = _phases[index]
+	_build_recipes(phase.get("recipes", []))
+
+
 func create_recipes() -> void:
+	_build_recipes(_config.get("recipes", []))
+
+
+func _build_recipes(list: Array) -> void:
 	available_recipes.clear()
-	for r: Dictionary in _config.get("recipes", []):
+	for r: Dictionary in list:
 		available_recipes.append(RecipeCatalog.make_recipe(
 			r.get("id", ""),
 			r.get("points", 100),

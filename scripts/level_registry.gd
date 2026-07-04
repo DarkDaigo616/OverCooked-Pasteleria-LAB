@@ -118,6 +118,43 @@ func get_levels() -> Array[Dictionary]:
 				],
 			},
 		},
+		{
+			# Etapa 10: cooperacion obligatoria. Las fases introducen las
+			# mecanicas de forma progresiva: 1) carga pesada (pastel gigante),
+			# 2) estacion sincronizada + cadena larga (pastel de boda),
+			# 3) todo combinado + eventos (urgente, cliente cambia).
+			"id": 9, "name": "Banquete de boda", "category": "desafios", "unlock_after": 8,
+			"orders": {
+				"recipes": [
+					{"id": "giant", "points": 200, "time": 120.0},
+					{"id": "wedding", "points": 260, "time": 150.0},
+					{"id": "strawberry", "points": 150, "time": 85.0},
+				],
+				"max": 3, "interval": 26.0, "initial": 1, "base_prep": 0.0,
+				"penalty": 75, "speed_bonus": true,
+				"phases": [
+					{"at": 0.0, "recipes": [
+						{"id": "giant", "points": 200, "time": 120.0},
+					]},
+					{"at": 90.0, "recipes": [
+						{"id": "wedding", "points": 260, "time": 150.0},
+					]},
+					{"at": 185.0, "recipes": [
+						{"id": "giant", "points": 200, "time": 120.0},
+						{"id": "wedding", "points": 260, "time": 150.0},
+						{"id": "strawberry", "points": 150, "time": 85.0},
+					]},
+				],
+			},
+			"events": {
+				"enabled": true,
+				"first_delay": 190.0,
+				"min_interval": 34.0,
+				"max_interval": 50.0,
+				"max_concurrent": 1,
+				"pool": ["rush_order", "decoration_change"],
+			},
+		},
 	]
 
 
@@ -146,13 +183,18 @@ func get_orders_config(level_id: int) -> Dictionary:
 
 
 ## Lista de ids de receta usadas por el nivel (para el recetario del HUD).
+## Incluye tambien las recetas de todas las fases progresivas.
 func get_level_recipe_ids(level_id: int) -> Array:
 	var ids: Array = []
 	var cfg := get_orders_config(level_id)
-	for r: Dictionary in cfg.get("recipes", []):
-		var id: String = r.get("id", "")
-		if not id.is_empty() and not ids.has(id):
-			ids.append(id)
+	var lists: Array = [cfg.get("recipes", [])]
+	for phase: Dictionary in cfg.get("phases", []):
+		lists.append(phase.get("recipes", []))
+	for list: Array in lists:
+		for r: Dictionary in list:
+			var id: String = r.get("id", "")
+			if not id.is_empty() and not ids.has(id):
+				ids.append(id)
 	return ids
 
 

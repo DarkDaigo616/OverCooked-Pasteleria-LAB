@@ -13,7 +13,15 @@ const CAKE_MODELS := {
 	"decorated_vanilla": "cake vanilla 3d model.glb",
 	"decorated_chocolate": "cake chocolate 3d model.glb",
 	"decorated_strawberry": "cake fresa 3d model.glb",
+	"decorated_wedding": "cake boda 3d model.glb",
 	"burned": "cake quemado 3d model.glb",
+}
+const GIANT_CAKE_MODEL := "cake gigante 3d model.glb"
+# Estos GLB vienen normalizados a 2.0 unidades (el resto mide ~1.0): se
+# corrigen a la mitad para que usen la misma escala que los demas.
+const MODEL_SIZE_FIX := {
+	"cake boda 3d model.glb": 0.5,
+	"cake gigante 3d model.glb": 0.5,
 }
 const BATTER_MODEL := "cake batter 3d model.glb"
 # Factor de tamaño de los modelos de pastel (ajusta si se ven grandes/chicos).
@@ -85,9 +93,21 @@ static func _find_mesh_instance(n: Node) -> MeshInstance3D:
 	return null
 
 
+const GIANT_SCALE := 1.3  # factor extra del pastel/masa gigante
+
 static func apply_ingredient_visual(root: Node3D, ingredient_type: String, state: String, mesh_scale: float = 1.0) -> void:
 	if ingredient_type == "cake_batter":
 		_apply_cake_batter_visual(root, mesh_scale, true)
+		return
+	if ingredient_type == "giant_batter":
+		_apply_cake_batter_visual(root, mesh_scale * GIANT_SCALE, true)
+		return
+	if ingredient_type == "giant_cake":
+		if state == "baked":
+			var giant_fix: float = MODEL_SIZE_FIX.get(GIANT_CAKE_MODEL, 1.0)
+			if _apply_tripo_model(root, TRIPO_BASE + GIANT_CAKE_MODEL, mesh_scale * GIANT_SCALE * CAKE_MODEL_SCALE * giant_fix):
+				return
+		_apply_cake_visual(root, state, mesh_scale * GIANT_SCALE)
 		return
 	if ingredient_type == "bad_batter":
 		_apply_cake_batter_visual(root, mesh_scale, false)
@@ -276,7 +296,9 @@ static func _apply_cake_visual(root: Node3D, state: String, mesh_scale: float) -
 	# Estado con modelo 3D -> usarlo. ruined_baked (mezcla fallida horneada) no
 	# tiene modelo propio y usa el procedural de abajo.
 	if CAKE_MODELS.has(state):
-		if _apply_tripo_model(root, TRIPO_BASE + CAKE_MODELS[state], mesh_scale * CAKE_MODEL_SCALE):
+		var file: String = CAKE_MODELS[state]
+		var fix: float = MODEL_SIZE_FIX.get(file, 1.0)
+		if _apply_tripo_model(root, TRIPO_BASE + file, mesh_scale * CAKE_MODEL_SCALE * fix):
 			return
 
 	var visual := _clear_generated_visual(root)

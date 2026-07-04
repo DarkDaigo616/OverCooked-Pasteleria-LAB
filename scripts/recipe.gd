@@ -6,10 +6,14 @@ class_name Recipe
 @export var points: int = 100
 @export var preparation_time: float = 60.0
 @export var icon_color: Color = Color.YELLOW
+## Id en RecipeCatalog (para consultar requirements); "" en recetas ad-hoc.
+@export var recipe_id: String = ""
 
 const TYPE_NAMES := {
 	"cake": "Pastel",
+	"giant_cake": "Pastel gigante",
 	"cake_batter": "Masa",
+	"giant_batter": "Masa gigante",
 	"bad_batter": "Masa",
 	"flour": "Harina",
 	"egg": "Huevo",
@@ -22,6 +26,7 @@ const STATE_NAMES := {
 	"decorated_vanilla": "vainilla",
 	"decorated_chocolate": "chocolate",
 	"decorated_strawberry": "fresa",
+	"decorated_wedding": "boda",
 	"ruined_baked": "fallido",
 	"raw": "crudo",
 	"cooked": "cocido",

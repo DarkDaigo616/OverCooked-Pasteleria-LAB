@@ -19,6 +19,15 @@ var process_timer: float = 0.0
 # cualquier estacion puede deshabilitarse; las que lo comprueban llaman a
 # _check_available() al inicio de su interact().
 var disabled: bool = false
+# ── Cooperacion (Etapa 10) — cualquier estacion puede declararlas via layout ──
+# sync_required: el proceso solo avanza con 2 chefs cerca (se pausa si uno se va).
+# rescuable: interactuar durante el proceso lo cancela conservando los items
+# (permite "rescatar" una accion equivocada antes de que sea irreversible).
+var sync_required: bool = false
+var rescuable: bool = false
+
+const SYNC_RANGE := 3.4
+var _sync_paused: bool = false
 
 var _highlight_ring: MeshInstance3D
 var _station_pad: MeshInstance3D
@@ -48,8 +57,51 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	if is_processing:
+		if sync_required and not _sync_satisfied():
+			if not _sync_paused:
+				_sync_paused = true
+				_notify_hud("%s en pausa: se necesitan 2 chefs cerca." % get_display_name(), false)
+			return
+		if _sync_paused:
+			_sync_paused = false
+			_notify_hud("%s retomada — ¡no se separen!" % get_display_name(), true)
 		process_timer += delta
 		_on_processing(delta)
+
+
+## True si hay suficientes chefs cerca para una estacion sincronizada. En
+## niveles de 1 jugador el requisito se considera cumplido (no bloquea).
+func _sync_satisfied() -> bool:
+	var players := get_tree().get_nodes_in_group("player")
+	if players.size() < 2:
+		return true
+	var near := 0
+	for p in players:
+		if p is Node3D and is_instance_valid(p):
+			if global_position.distance_to((p as Node3D).global_position) <= SYNC_RANGE:
+				near += 1
+	return near >= 2
+
+
+## Rescate generico: cancela el proceso en curso conservando los items dentro.
+## Devuelve true si hubo rescate (el interact del llamador debe salir).
+func try_rescue(_player: ChefPlayer) -> bool:
+	if not rescuable or not is_processing:
+		return false
+	is_processing = false
+	process_timer = 0.0
+	_sync_paused = false
+	var pb := get_node_or_null("ProgressBar3D")
+	if pb and pb.has_method("show_bar"):
+		pb.show_bar(false)
+	_notify_hud("¡Rescate! Proceso de %s cancelado." % get_display_name(), true)
+	return true
+
+
+func _notify_hud(text: String, success: bool) -> void:
+	var hud := get_tree().get_first_node_in_group("game_hud")
+	if hud and hud.has_method("show_delivery_feedback"):
+		hud.show_delivery_feedback(text, success)
 
 
 func _on_processing(_delta: float) -> void:

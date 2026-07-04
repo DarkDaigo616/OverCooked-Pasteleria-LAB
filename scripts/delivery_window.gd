@@ -45,6 +45,8 @@ func interact(player: ChefPlayer) -> void:
 		return
 
 	if not current_items.is_empty() and not player.has_item():
+		if not player.can_lift(current_items[0]):
+			return
 		var item := take_item()
 		if item:
 			player.pickup_item(item)
@@ -118,35 +120,38 @@ func _finish_delivery() -> void:
 			_progress_bar.show_bar(false)
 
 
+# Tipos de item que la ventana acepta como pastel terminado.
+const DELIVERABLE_TYPES := ["cake", "giant_cake"]
+
+
 func _validate_delivery_item(item: Node3D) -> Dictionary:
 	var ingredient_type := str(item.get_meta("ingredient_type", ""))
 	var state := str(item.get_meta("state", ""))
 
-	if ingredient_type == "cake_batter" or ingredient_type == "bad_batter":
+	if ingredient_type.ends_with("batter"):
 		return {"success": false, "reason": "Todavia es masa. Primero usa el horno."}
-	if ingredient_type != "cake":
+	if not DELIVERABLE_TYPES.has(ingredient_type):
 		return {"success": false, "reason": "Solo puedes entregar pasteles."}
 
+	if state == "baked" or state.begins_with("decorated_"):
+		return {"success": true, "reason": ""}
 	match state:
-		"baked":
-			return {"success": true, "reason": ""}
 		"burned":
 			return {"success": false, "reason": "El pastel se quemo. Prepara otro."}
 		"ruined_baked":
 			return {"success": false, "reason": "La mezcla salio mal. Prepara otro."}
-		"decorated_vanilla", "decorated_chocolate", "decorated_strawberry":
-			return {"success": true, "reason": ""}
 		_:
 			return {"success": false, "reason": "Ese pastel no esta terminado."}
 
 
 func _get_delivery_entry(item: Node3D) -> Dictionary:
-	if str(item.get_meta("ingredient_type", "")) != "cake":
+	var ingredient_type := str(item.get_meta("ingredient_type", ""))
+	if not DELIVERABLE_TYPES.has(ingredient_type):
 		return {}
 	var state := str(item.get_meta("state", ""))
 	if state != "baked" and not state.begins_with("decorated_"):
 		return {}
-	return {"type": "cake", "state": state}
+	return {"type": ingredient_type, "state": state}
 
 
 func _show_delivery_message(text: String, success: bool) -> void:

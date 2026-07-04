@@ -5,7 +5,7 @@ class_name LevelLayouts
 
 
 static func get_level_count() -> int:
-	return 8
+	return 9
 
 
 static func get_layout(level_id: int) -> Dictionary:
@@ -24,6 +24,8 @@ static func get_layout(level_id: int) -> Dictionary:
 			return _turno_noche_layout()
 		8:
 			return _chaos_layout()
+		9:
+			return _wedding_layout()
 		_:
 			return _intro_layout()
 
@@ -208,6 +210,44 @@ static func _chaos_layout() -> Dictionary:
 			{"type": "decorate", "decoration": "vanilla",    "pos": Vector3(10.0, 0.5, -7.5), "decoration_time": 2.5},
 			{"type": "decorate", "decoration": "chocolate",  "pos": Vector3(10.0, 0.5, -3.0), "decoration_time": 2.5},
 			{"type": "decorate", "decoration": "strawberry", "pos": Vector3(10.0, 0.5,  1.5), "decoration_time": 2.5},
+			# Frente — dos entregas, basura, recetario
+			{"type": "delivery",    "pos": Vector3(-2.5, 0.5, 7.5), "delivery_time": 0.8},
+			{"type": "delivery",    "pos": Vector3( 4.0, 0.5, 7.5), "delivery_time": 0.8},
+			{"type": "trash",       "pos": Vector3(-8.0, 0.5, 7.5)},
+			{"type": "recipe_book", "pos": Vector3( 9.5, 0.5, 7.5)},
+		],
+	}
+
+
+static func _wedding_layout() -> Dictionary:
+	# Etapa 10: cooperacion obligatoria (ver fases en LevelRegistry).
+	# - Masa gigante: item pesado -> 2 chefs para cargarla (al horno y a entrega).
+	# - Decoracion Boda: sync (2 chefs cerca o se pausa) + rescuable (cancelar
+	#   a tiempo un acabado equivocado) + cadena larga (entra pastel de vainilla).
+	return {
+		"name": "Banquete de boda",
+		"game_mode": "real",
+		"duration": 300.0,
+		"star_thresholds": [3, 5, 7],
+		"no_burn_for_3_stars": true,
+		"coop_mode": true,
+		"queue_mode": true,
+		"spawn": Vector3(-4.0, 1.0, 6.0),
+		"spawn_p2": Vector3(4.0, 1.0, 6.0),
+		"stations": [
+			# Ingredientes — izquierda. La masa gigante es PESADA (2 chefs).
+			{"type": "ingredient", "ingredient": "flour", "pos": Vector3(-11.0, 0.5, -7.5), "pickup_time": 0.6, "mesh_scale": 0.72},
+			{"type": "ingredient", "ingredient": "egg",   "pos": Vector3(-11.0, 0.5, -2.5), "pickup_time": 0.6, "mesh_scale": 0.78},
+			{"type": "ingredient", "ingredient": "giant_batter", "pos": Vector3(-11.0, 0.5, 2.5), "pickup_time": 0.8, "heavy": true},
+			# Batidora (solo para la cadena de boda/fresa)
+			{"type": "mix", "pos": Vector3(-4.5, 0.5, -7.5), "mix_time": 3.0},
+			# Dos hornos
+			{"type": "cook", "pos": Vector3(2.5, 0.5, -7.5), "cook_time": 5.0, "burn_time": 13.0},
+			{"type": "cook", "pos": Vector3(2.5, 0.5, -2.5), "cook_time": 5.0, "burn_time": 13.0},
+			# Decoradoras: vainilla (paso 1 de la boda), Boda (sync+rescate), fresa
+			{"type": "decorate", "decoration": "vanilla",    "pos": Vector3(10.0, 0.5, -7.5), "decoration_time": 2.5},
+			{"type": "decorate", "decoration": "wedding",    "pos": Vector3(10.0, 0.5, -2.5), "decoration_time": 4.5, "input_state": "decorated_vanilla", "sync": true, "rescuable": true},
+			{"type": "decorate", "decoration": "strawberry", "pos": Vector3(10.0, 0.5,  2.5), "decoration_time": 2.5, "rescuable": true},
 			# Frente — dos entregas, basura, recetario
 			{"type": "delivery",    "pos": Vector3(-2.5, 0.5, 7.5), "delivery_time": 0.8},
 			{"type": "delivery",    "pos": Vector3( 4.0, 0.5, 7.5), "delivery_time": 0.8},

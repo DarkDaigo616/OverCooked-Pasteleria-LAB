@@ -1,6 +1,6 @@
 # Overcooked Style Game - Proyecto Godot
 
-**Version:** 0.9.0
+**Version:** 0.10.0
 
 ## Descripcion
 
@@ -28,7 +28,7 @@ El menu organiza los niveles en 4 categorias:
 | Intro | 1 | Tutorial de mecanicas basicas |
 | Pasteleria | 2, 3, 4 | Recetas completas, tiempo y cola de acciones |
 | Cooperativo | 5 | Dos jugadores en la misma pantalla |
-| Desafios | 6, 7, 8 | Niveles reales con estrellas, tiempo limite y eventos |
+| Desafios | 6, 7, 8, 9 | Niveles reales con estrellas, tiempo limite, eventos y coop obligatorio |
 
 Los niveles de Desafios se desbloquean en orden: hay que completar el anterior para acceder al siguiente.
 
@@ -163,6 +163,43 @@ que obliga a los jugadores a re-priorizar y coordinar.
 | ★☆☆ | Entregar 4 pedidos |
 | ★★☆ | Entregar 7 pedidos |
 | ★★★ | Entregar 10 pedidos sin quemar pasteles |
+
+---
+
+### Nivel 9 — Banquete de boda  _(Etapa 10)_
+**Cooperacion obligatoria**: pedidos que NO se pueden completar como si jugaras solo.
+**5 minutos**, cooperativo, con fases progresivas que introducen las mecanicas una a una.
+
+| Fase | Cuando | Que ensena |
+|------|--------|------------|
+| 1 | 0:00 | Pastel gigante: la masa es PESADA — 2 chefs juntos para cargarla |
+| 2 | 1:30 | Pastel de boda: cadena larga + estacion sincronizada (2 chefs cerca) |
+| 3 | 3:05 | Todo combinado + pastel con fresa + eventos (urgente, cliente cambia) |
+
+| Pedido | Puntos | Tiempo | Requisito |
+|--------|--------|--------|-----------|
+| Pastel gigante | 200 | 120s | Carga pesada (2 chefs) |
+| Pastel de boda | 260 | 150s | vainilla → acabado Boda (sync, rescatable) |
+| Pastel con fresa | 150 | 85s | — |
+
+**Sistema de estrellas:** ★ 3 pedidos | ★★ 5 pedidos | ★★★ 7 pedidos sin quemar.
+
+---
+
+## Mecanicas cooperativas (Etapa 10)
+
+Sistema declarativo y reutilizable — cualquier receta/estacion/item puede usarlas:
+
+| Mecanica | Como se declara | Que provoca |
+|----------|-----------------|-------------|
+| **Carga pesada** | item con meta `heavy` (via layout del ingrediente) | Levantarlo requiere al otro chef cerca con manos libres; el ayudante lo sigue automaticamente ("ven conmigo") |
+| **Estacion sincronizada** | `"sync": true` en el layout | El proceso se PAUSA si no hay 2 chefs cerca ("quedate en esta estacion") |
+| **Rescate** | `"rescuable": true` en el layout | Interactuar durante el proceso lo cancela conservando los items ("cancela antes de que lo eche a perder") |
+| **Cadenas de decoracion** | `"input_state"` en decoradoras | Decorar sobre un pastel ya decorado (boda = vainilla + acabado) |
+| **Requisitos de receta** | `requirements` en RecipeCatalog | La receta declara `two_player`, `heavy_carry`, `sync_station`... y el HUD muestra "REQUIERE 2 CHEFS" |
+| **Fases progresivas** | `orders.phases` en LevelRegistry | El pool de recetas cambia con el tiempo del nivel |
+
+Agregar un pastel cooperativo nuevo = declarar sus datos (receta + requisitos + estaciones en el layout). Cero logica nueva.
 
 ---
 
@@ -307,6 +344,7 @@ hablan con `EventContext`, no con rutas de nodos) y efectos reversibles
 | 0.7.0 | Etapa 7 | Primer nivel real (Nivel 6 "Pasteleria de barrio"): sistema de estrellas, contador de pedidos, 3 min, reintentar |
 | 0.8.0 | Etapa 8 | Nivel 7 "Turno de Noche" (diseno por restricciones); menu por categorias (Intro/Pasteleria/Coop/Desafios); desbloqueo secuencial; dev mode separado del progreso real |
 | 0.9.0 | Etapa 9 | Sistema de eventos caoticos modular (horno, derrame, cambio de decoracion, batidora, pedido urgente) y Nivel 8 "Servicio caotico". Refactor de base: catalogo unico de recetas, definicion de nivel consolidada en LevelRegistry (ordenes/eventos), ganchos de runtime en estaciones |
+| 0.10.0 | Etapa 10 | Cooperacion obligatoria: carga pesada (2 chefs), estaciones sincronizadas, rescate de procesos, cadenas de decoracion, requisitos declarativos de receta, fases progresivas. Nivel 9 "Banquete de boda" con pastel gigante y pastel de boda |
 
 ---
 

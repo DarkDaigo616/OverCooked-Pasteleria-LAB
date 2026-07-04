@@ -45,6 +45,15 @@ var held_item: Node3D = null
 var movement_enabled: bool = true
 var _anim_player: AnimationPlayer = null
 var _locomotion_state: String = ""
+# ── Carga pesada (Etapa 10) ──
+# Un item con meta "heavy" solo se puede levantar/mover entre DOS chefs: el que
+# lo carga y un ayudante que lo sigue automaticamente hasta que lo suelte.
+const HEAVY_ASSIST_RANGE := 4.2
+const HEAVY_FOLLOW_DISTANCE := 1.7
+const HEAVY_SPEED_MUL := 0.75
+var _assist_carrier: ChefPlayer = null   # a quien estoy ayudando a cargar
+var _heavy_helper: ChefPlayer = null     # quien me ayuda a cargar
+var _carry_speed_mul: float = 1.0
 var queue_mode_enabled: bool = false
 var _action_queue: Array = []
 var _queue_penalty_remaining: float = 0.0
@@ -269,6 +278,15 @@ func _physics_process(delta: float) -> void:
 		velocity = Vector3.ZERO
 		_update_locomotion_anim()
 		return
+	if _assist_carrier != null:
+		if not is_instance_valid(_assist_carrier):
+			_assist_carrier = null
+		else:
+			_follow_carrier(delta)
+			move_and_slide()
+			_enforce_safe_position()
+			_update_locomotion_anim()
+			return
 	if _queue_penalty_remaining > 0.0:
 		_queue_penalty_remaining -= delta
 		velocity.x = move_toward(velocity.x, 0, friction * delta)
@@ -299,6 +317,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not movement_enabled:
 		return
 	if not is_active_player:
+		return
+	if _assist_carrier != null:
+		# Ayudando a cargar un objeto pesado: sigue al cargador, sin ordenes.
+		if event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+			_show_hud_message("Estas ayudando a cargar — suelten el objeto primero.", false)
 		return
 	if queue_mode_enabled and _queue_penalty_remaining > 0.0:
 		return
@@ -500,7 +523,7 @@ func handle_movement(delta: float) -> void:
 
 	if _has_move_target and distance > click_stop_distance:
 		var direction := to_target / distance
-		var eff_speed := speed * speed_scale
+		var eff_speed := speed * speed_scale * _carry_speed_mul
 		velocity.x = move_toward(velocity.x, direction.x * eff_speed, acceleration * delta)
 		velocity.z = move_toward(velocity.z, direction.z * eff_speed, acceleration * delta)
 	else:
@@ -695,6 +718,22 @@ func _simplify_path(path: Array[Vector3]) -> Array[Vector3]:
 	return simplified
 
 
+## Movimiento del ayudante de carga: sigue al cargador manteniendo distancia.
+func _follow_carrier(delta: float) -> void:
+	var to_carrier := _assist_carrier.global_position - global_position
+	to_carrier.y = 0.0
+	var dist := to_carrier.length()
+	if dist > HEAVY_FOLLOW_DISTANCE:
+		var dir := to_carrier / dist
+		var eff := speed * speed_scale
+		velocity.x = move_toward(velocity.x, dir.x * eff, acceleration * delta)
+		velocity.z = move_toward(velocity.z, dir.z * eff, acceleration * delta)
+	else:
+		velocity.x = move_toward(velocity.x, 0, friction * delta)
+		velocity.z = move_toward(velocity.z, 0, friction * delta)
+	handle_rotation(delta)
+
+
 func handle_rotation(delta: float) -> void:
 	if velocity.length() > 0.5:
 		# Modelos 3D miran hacia -Z; atan2(-x, -z) alinea la vista con la direccion de movimiento
@@ -850,8 +889,56 @@ func _get_nearest_dropped_item() -> Node3D:
 	return best
 
 
+## True si este chef puede levantar el item. Los items pesados necesitan al
+## otro chef cerca con las manos libres; muestra el motivo si no se puede.
+## Las estaciones deben llamar esto ANTES de sacar el item de su holder.
+func can_lift(item: Node3D) -> bool:
+	if item == null:
+		return false
+	if not item.get_meta("heavy", false):
+		return true
+	var helper := _find_heavy_helper()
+	if helper == null:
+		_show_hud_message("¡Muy pesado! Se necesitan 2 chefs juntos (manos libres).", false)
+		return false
+	return true
+
+
+func _find_heavy_helper() -> ChefPlayer:
+	for node in get_tree().get_nodes_in_group("player"):
+		var other := node as ChefPlayer
+		if other == null or other == self or not is_instance_valid(other):
+			continue
+		if other.has_item():
+			continue
+		if global_position.distance_to(other.global_position) <= HEAVY_ASSIST_RANGE:
+			return other
+	return null
+
+
+func _engage_heavy_assist() -> void:
+	var helper := _find_heavy_helper()
+	if helper == null:
+		return
+	_heavy_helper = helper
+	_carry_speed_mul = HEAVY_SPEED_MUL
+	helper._assist_carrier = self
+	helper._has_move_target = false
+	helper.cancel_action_queue()
+	_show_hud_message("¡Cargando entre los dos! El otro chef te sigue.", true)
+
+
+func _release_heavy_assist() -> void:
+	_carry_speed_mul = 1.0
+	if _heavy_helper and is_instance_valid(_heavy_helper):
+		_heavy_helper._assist_carrier = null
+	_heavy_helper = null
+
+
 func pickup_item(item: Node3D) -> bool:
 	if held_item:
+		return false
+	if not can_lift(item):
 		return false
 
 	held_item = item
@@ -864,6 +951,9 @@ func pickup_item(item: Node3D) -> bool:
 	_apply_held_item_scale(item)
 	_set_item_physics_enabled(item, false)
 
+	if item.get_meta("heavy", false):
+		_engage_heavy_assist()
+
 	item_picked_up.emit(item)
 	_refresh_hand_visuals()
 	return true
@@ -875,6 +965,7 @@ func take_item_from_hand() -> Node3D:
 	var item := held_item
 	hand_position.remove_child(item)
 	held_item = null
+	_release_heavy_assist()
 	_restore_item_scale(item)
 	item_dropped.emit(item)
 	_refresh_hand_visuals()
@@ -887,6 +978,7 @@ func destroy_held_item() -> void:
 	var item := held_item
 	hand_position.remove_child(item)
 	held_item = null
+	_release_heavy_assist()
 	item.queue_free()
 	_refresh_hand_visuals()
 
@@ -907,6 +999,7 @@ func drop_item() -> void:
 	item.global_position = drop_pos
 	item.add_to_group("dropped_item")
 	held_item = null
+	_release_heavy_assist()
 	_set_item_physics_enabled(item, true)
 
 	item_dropped.emit(item)
