@@ -3,6 +3,10 @@ class_name DecorationStation
 
 @export var decoration_time: float = 3.0
 @export var decoration_type: String = "vanilla"
+# Estado que debe traer el pastel para poder decorarse aqui. "baked" es el
+# normal; una cadena larga (pastel de boda) usa un estado decorado previo,
+# p. ej. input_state = "decorated_vanilla" -> salida "decorated_wedding".
+@export var input_state: String = "baked"
 
 var _progress_bar: ProgressBar3D
 
@@ -10,6 +14,7 @@ const DECORATION_NAMES := {
 	"vanilla": "Vainilla",
 	"chocolate": "Chocolate",
 	"strawberry": "Fresa",
+	"wedding": "Boda",
 }
 
 
@@ -24,6 +29,8 @@ func interact(player: ChefPlayer) -> void:
 	super.interact(player)
 
 	if is_processing:
+		if try_rescue(player):
+			return
 		_show_station_message("Decoracion en proceso.", false)
 		return
 
@@ -90,22 +97,23 @@ func _finish_decorating() -> void:
 
 func _validate_cake(item: Node3D) -> Dictionary:
 	if item == null:
-		return {"success": false, "reason": "Trae un pastel horneado."}
+		return {"success": false, "reason": "Trae un pastel."}
 	if str(item.get_meta("ingredient_type", "")) != "cake":
-		return {"success": false, "reason": "Solo puedes decorar pasteles horneados."}
+		return {"success": false, "reason": "Solo puedes decorar pasteles."}
 
 	var state := str(item.get_meta("state", ""))
+	if state == input_state:
+		return {"success": true, "reason": ""}
 	match state:
-		"baked":
-			return {"success": true, "reason": ""}
 		"burned":
 			return {"success": false, "reason": "El pastel esta quemado."}
 		"ruined_baked":
 			return {"success": false, "reason": "La mezcla salio mal; prepara otro."}
-		"decorated_vanilla", "decorated_chocolate", "decorated_strawberry":
-			return {"success": false, "reason": "Ya decorado — llevatelo a la entrega.", "already_done": true}
-		_:
-			return {"success": false, "reason": "Primero hornea la masa."}
+	if state == _get_decorated_state():
+		return {"success": false, "reason": "Ya decorado — llevatelo a la entrega.", "already_done": true}
+	# Estado que no coincide con la entrada de ESTA estacion (cadenas largas).
+	var needed := str(Recipe.STATE_NAMES.get(input_state, input_state))
+	return {"success": false, "reason": "Esta mesa necesita un pastel (%s)." % needed}
 
 
 func _get_decorated_state() -> String:
@@ -115,6 +123,8 @@ func _get_decorated_state() -> String:
 func _get_finished_display_name() -> String:
 	if decoration_type == "vanilla":
 		return "Pastel de vainilla"
+	if decoration_type == "wedding":
+		return "Pastel de boda"
 	return "Pastel con " + _get_decoration_display_name().to_lower()
 
 

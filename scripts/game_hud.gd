@@ -37,7 +37,9 @@ const ORDER_OUTLINE_SIZE := 1
 
 const INGREDIENT_NAMES := {
 	"cake": "Pastel",
+	"giant_cake": "Pastel gigante",
 	"cake_batter": "Masa",
+	"giant_batter": "Masa gigante",
 	"bad_batter": "Masa",
 	"flour": "Harina",
 	"egg": "Huevo",
@@ -53,6 +55,7 @@ const STATE_NAMES := {
 	"decorated_vanilla": "vainilla",
 	"decorated_chocolate": "chocolate",
 	"decorated_strawberry": "fresa",
+	"decorated_wedding": "boda",
 	"ruined_baked": "fallido",
 	"raw": "crudo",
 	"cooked": "cocido",
@@ -1301,6 +1304,10 @@ func create_order_card(order: Dictionary, _order_number: int = 1) -> PanelContai
 	var icon_color := Color(0.46, 0.78, 0.46)
 	for ing in recipe.required_ingredients:
 		var entry := Recipe.normalize_entry(ing)
+		if str(entry["type"]) == "giant_cake":
+			is_complex = true
+			icon_text = "GI"
+			icon_color = Color(0.85, 0.55, 0.15)
 		match str(entry["state"]):
 			"decorated_chocolate":
 				is_complex = true
@@ -1314,6 +1321,10 @@ func create_order_card(order: Dictionary, _order_number: int = 1) -> PanelContai
 				is_complex = true
 				icon_text = "VA"
 				icon_color = Color(0.92, 0.82, 0.42)
+			"decorated_wedding":
+				is_complex = true
+				icon_text = "BO"
+				icon_color = Color(0.78, 0.68, 0.92)
 
 	var border_col := Color(0.46, 0.72, 0.42) if not is_complex else Color(0.72, 0.50, 0.22)
 	# Resaltar pedidos afectados por eventos (Etapa 9).
@@ -1399,6 +1410,14 @@ func create_order_card(order: Dictionary, _order_number: int = 1) -> PanelContai
 		badge.text = badge_text
 		_style_order_label(badge, 13, badge_col)
 		name_col.add_child(badge)
+
+	# Requisitos cooperativos declarados por la receta (Etapa 10).
+	var reqs: Dictionary = RecipeCatalog.get_requirements(recipe.recipe_id)
+	if reqs.get("two_player", false):
+		var coop_badge := Label.new()
+		coop_badge.text = "REQUIERE 2 CHEFS"
+		_style_order_label(coop_badge, 13, Color(0.16, 0.62, 0.72))
+		name_col.add_child(coop_badge)
 
 	var time_label := Label.new()
 	time_label.text = format_time(order["time_remaining"])

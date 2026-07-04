@@ -2,14 +2,11 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cjbstjystxikt"
+uid="uid://by1qsu6aq6ko4"
 path.s3tc="res://.godot/imported/cake horneado 3d model_cupcake+3d+model_rm.jpg-a811b90300ae2a86e499e4aa8ef96e69.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
-}
-generator_parameters={
-"md5": "be1c1c3617fc5808ef76deea8d7a3605"
 }
 
 [deps]

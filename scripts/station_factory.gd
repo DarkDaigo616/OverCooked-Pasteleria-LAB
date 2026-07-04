@@ -4,6 +4,22 @@ class_name StationFactory
 const Materials = preload("res://materials/bakery_materials.gd")
 const TINY_TREATS_BASE := "res://assets/{models,textures,sounds}/Tiny_Treats_Bakery_Interior_1.1_FREE/Assets/gltf/"
 const KAYKIT_BASE := "res://assets/{models,textures,sounds}/KayKit_Restaurant_Bits_1.0_FREE/Assets/gltf/"
+const TRIPO_BASE := "res://assets/{models,textures,sounds}/Tripo3D/"
+
+# Modelos Tripo de estaciones completas. Se auto-escalan y apoyan en el piso
+# midiendo su AABB (las normalizaciones de Tripo varian entre modelos).
+const DECORATION_STATION_MODELS := {
+	"vanilla": TRIPO_BASE + "station vainilla 3d model.glb",
+	"chocolate": TRIPO_BASE + "station chocolate 3d model.glb",
+	"strawberry": TRIPO_BASE + "station fresa 3d model.glb",
+	"wedding": TRIPO_BASE + "station boda 3d model.glb",
+}
+const TRASH_STATION_MODEL := TRIPO_BASE + "basurero 3d model.glb"
+# Ajustes por modelo: "width" = ancho objetivo (default 1.9), "rot" = giro Y.
+const TRIPO_STATION_OPTS := {
+	"basurero 3d model.glb": {"width": 1.15, "rot": 90.0},
+	"station boda 3d model.glb": {"rot": 90.0, "width": 2.5},
+}
 const STAND_MIXER_PATH := TINY_TREATS_BASE + "stand_mixer.gltf"
 const COUNTER_SHAPE_SIZE := Vector3(1.95, 1.38, 1.88)
 const MESH_SCALE := 1.75
@@ -11,6 +27,7 @@ const OVEN_MESH_SCALE := 1.2
 
 const INGREDIENT_MESHES := {
 	"cake_batter": TINY_TREATS_BASE + "mixing_bowl.gltf",
+	"giant_batter": TINY_TREATS_BASE + "mixing_bowl.gltf",
 	"flour": TINY_TREATS_BASE + "flour_sack_open.gltf",
 	"egg": TINY_TREATS_BASE + "egg_A.gltf",
 	"sugar": TINY_TREATS_BASE + "tin_B_beige.gltf",
@@ -22,6 +39,7 @@ const INGREDIENT_MESHES := {
 
 const INGREDIENT_COLORS := {
 	"cake_batter": Color(0.95, 0.74, 0.32),
+	"giant_batter": Color(0.98, 0.62, 0.24),
 	"flour": Color(0.94, 0.89, 0.78),
 	"egg": Color(1.0, 0.86, 0.34),
 	"sugar": Color(0.98, 0.95, 0.9),
@@ -33,6 +51,7 @@ const INGREDIENT_COLORS := {
 
 const LABELS := {
 	"cake_batter": "Ingredientes",
+	"giant_batter": "Ingredientes: Masa gigante",
 	"flour": "Ingredientes: Harina",
 	"egg": "Ingredientes: Huevo",
 	"sugar": "Ingredientes: Azucar",
@@ -45,6 +64,7 @@ const LABELS := {
 	"decorate_vanilla": "Decoracion: Vainilla",
 	"decorate_chocolate": "Decoracion: Chocolate",
 	"decorate_strawberry": "Decoracion: Fresa",
+	"decorate_wedding": "Decoracion: Boda",
 	"recipe_book": "Recetario",
 	"delivery": "Entregar",
 	"trash": "Basura",
@@ -53,24 +73,37 @@ const LABELS := {
 
 static func build_station(data: Dictionary) -> StaticBody3D:
 	var stype: String = data.get("type", "")
+	var body: StaticBody3D
 	match stype:
 		"ingredient":
-			return _build_ingredient(data)
+			body = _build_ingredient(data)
 		"mix":
-			return _build_mixing(data)
+			body = _build_mixing(data)
 		"cook":
-			return _build_cooking(data)
+			body = _build_cooking(data)
 		"decorate":
-			return _build_decoration(data)
+			body = _build_decoration(data)
 		"recipe_book":
-			return _build_recipe_book(data)
+			body = _build_recipe_book(data)
 		"delivery":
-			return _build_delivery(data)
+			body = _build_delivery(data)
 		"trash":
-			return _build_trash(data)
+			body = _build_trash(data)
 		_:
 			push_warning("StationFactory: tipo desconocido ", stype)
-			return StaticBody3D.new()
+			body = StaticBody3D.new()
+	_apply_coop_flags(body, data)
+	return body
+
+
+## Cooperacion declarativa (Etapa 10): CUALQUIER estacion del layout puede
+## declarar "sync": true (requiere 2 chefs cerca durante el proceso) o
+## "rescuable": true (interactuar durante el proceso lo cancela).
+static func _apply_coop_flags(body: StaticBody3D, data: Dictionary) -> void:
+	if data.get("sync", false):
+		body.set("sync_required", true)
+	if data.get("rescuable", false):
+		body.set("rescuable", true)
 
 
 static func _base_station(
@@ -79,7 +112,8 @@ static func _base_station(
 	mesh_path: String,
 	station_type: String,
 	mesh_scale: float = MESH_SCALE,
-	ingredient_type: String = ""
+	ingredient_type: String = "",
+	tripo_path: String = ""
 ) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.position = pos
@@ -95,14 +129,63 @@ static func _base_station(
 	col.shape = shape
 	body.add_child(col)
 
-	if not _add_asset_child(body, mesh_path, "StationMesh", Vector3.ONE * mesh_scale, Vector3(0, 0.08, 0)):
-		_add_fallback_counter(body, station_type)
+	# Modelo Tripo de estacion completa: sustituye la mesa + props procedurales.
+	var tripo_ok := false
+	if not tripo_path.is_empty():
+		tripo_ok = _add_tripo_station_mesh(body, tripo_path)
+	if tripo_ok:
+		body.set_meta("tripo_mesh", true)
+	else:
+		if not _add_asset_child(body, mesh_path, "StationMesh", Vector3.ONE * mesh_scale, Vector3(0, 0.08, 0)):
+			_add_fallback_counter(body, station_type)
 
 	body.set_meta("display_name", label_text)
-	_add_station_dressing(body, station_type)
+	if not tripo_ok:
+		_add_station_dressing(body, station_type)
 
 	StationVisuals.apply_to_station(body, label_text, station_type)
 	return body
+
+
+## Instancia un modelo Tripo como malla de estacion: lo escala para que su
+## lado mas ancho mida el objetivo y apoya su base en el piso (pivote centrado).
+static func _add_tripo_station_mesh(body: Node3D, path: String) -> bool:
+	if not ResourceLoader.exists(path):
+		return false
+	var scene := load(path) as PackedScene
+	if scene == null:
+		return false
+	var node := scene.instantiate() as Node3D
+	if node == null:
+		return false
+	node.name = "StationMesh"
+
+	var opts: Dictionary = TRIPO_STATION_OPTS.get(path.get_file(), {})
+	var acc: Array = []
+	_collect_aabb(node, Transform3D.IDENTITY, acc)
+	if not acc.is_empty():
+		var box: AABB = acc[0]
+		var widest := maxf(maxf(box.size.x, box.size.z), 0.01)
+		var s: float = opts.get("width", 1.9) / widest
+		node.scale = Vector3.ONE * s
+		node.position.y = -box.position.y * s
+	node.rotation_degrees.y = opts.get("rot", 0.0)
+	body.add_child(node)
+	return true
+
+
+static func _collect_aabb(node: Node, xf: Transform3D, acc: Array) -> void:
+	if node is MeshInstance3D:
+		var box: AABB = xf * (node as MeshInstance3D).get_aabb()
+		if acc.is_empty():
+			acc.append(box)
+		else:
+			acc[0] = (acc[0] as AABB).merge(box)
+	for c in node.get_children():
+		var child_xf := xf
+		if c is Node3D:
+			child_xf = xf * (c as Node3D).transform
+		_collect_aabb(c, child_xf, acc)
 
 
 static func _add_fallback_counter(body: StaticBody3D, station_type: String) -> void:
@@ -423,8 +506,11 @@ static func _build_ingredient(data: Dictionary) -> StaticBody3D:
 	body.ingredient_type = ing
 	body.ingredient_color = INGREDIENT_COLORS.get(ing, Color.WHITE)
 	body.pickup_time = 0.0
+	body.heavy_ingredient = data.get("heavy", false)
 	if ing == "cake_batter":
 		body.ingredient_mesh_scale = 0.75
+	elif ing == "giant_batter":
+		body.ingredient_mesh_scale = 0.85
 	elif data.has("mesh_scale"):
 		body.ingredient_mesh_scale = data.get("mesh_scale", 0.32)
 	_add_progress_bar(body)
@@ -469,12 +555,17 @@ static func _build_decoration(data: Dictionary) -> StaticBody3D:
 		data.get("pos", Vector3.ZERO),
 		LABELS.get(label_key, "Decoracion"),
 		TINY_TREATS_BASE + "countertop_straight_B_short.gltf",
-		"decorate"
+		"decorate",
+		MESH_SCALE,
+		"",
+		DECORATION_STATION_MODELS.get(decoration_type, "")
 	)
 	body.set_script(load("res://scripts/decoration_station.gd"))
 	body.decoration_type = decoration_type
 	body.decoration_time = data.get("decoration_time", 3.0)
-	_add_typed_decoration_props(body, decoration_type)
+	body.input_state = data.get("input_state", "baked")
+	if not body.get_meta("tripo_mesh", false):
+		_add_typed_decoration_props(body, decoration_type)
 	_add_item_holder(body)
 	_add_progress_bar(body)
 	return body
@@ -497,7 +588,9 @@ static func _build_trash(data: Dictionary) -> StaticBody3D:
 		LABELS["trash"],
 		TINY_TREATS_BASE + "tin_B_grey.gltf",
 		"trash",
-		1.65
+		1.65,
+		"",
+		TRASH_STATION_MODEL
 	)
 	body.set_script(load("res://scripts/trash_station.gd"))
 	return body

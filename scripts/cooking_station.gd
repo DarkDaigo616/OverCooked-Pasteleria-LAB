@@ -17,8 +17,20 @@ var is_burned: bool = false
 var _item_cooked: bool = false
 
 var _progress_bar: ProgressBar3D
+var _oven_glow: MeshInstance3D
 
 const COOKING_PROGRESS_META := "cooking_progress"
+const GLOW_ORANGE := Color(1.0, 0.48, 0.16)
+const GLOW_GREEN := Color(0.2, 0.9, 0.3)
+const GLOW_RED := Color(0.9, 0.1, 0.05)
+
+# Tabla de horneado data-driven: que produce cada masa. Agregar una masa nueva
+# (p. ej. la gigante) = una entrada aqui, sin tocar la logica.
+const BAKE_RESULTS := {
+	"cake_batter": {"type": "cake", "state": "baked", "name": "Pastel horneado"},
+	"giant_batter": {"type": "giant_cake", "state": "baked", "name": "Pastel gigante"},
+	"bad_batter": {"type": "cake", "state": "ruined_baked", "name": "Pastel fallido"},
+}
 
 
 func _ready() -> void:
@@ -26,12 +38,14 @@ func _ready() -> void:
 	station_name = "Horno"
 	max_items = 1
 	_progress_bar = $ProgressBar3D if has_node("ProgressBar3D") else null
+	_oven_glow = find_child("WarmOvenGlow", true, false) as MeshInstance3D
 
 
 func _process(delta: float) -> void:
 	super._process(delta)
 
 	if not is_cooking or current_items.is_empty():
+		_update_oven_visual()
 		return
 
 	cooking_timer += delta
@@ -41,22 +55,16 @@ func _process(delta: float) -> void:
 	if cooking_timer >= cook_time and not _item_cooked:
 		_item_cooked = true
 		is_processing = false  # baking done — queued player can now pick up
-		if item.get_meta("ingredient_type", "") == "cake_batter":
-			item.name = "cake"
-			item.set_meta("ingredient_type", "cake")
-			item.set_meta("state", "baked")
+		var ing: String = item.get_meta("ingredient_type", "")
+		if BAKE_RESULTS.has(ing):
+			var res: Dictionary = BAKE_RESULTS[ing]
+			item.name = res["type"]
+			item.set_meta("ingredient_type", res["type"])
+			item.set_meta("state", res["state"])
 			item.set_meta("is_cake", true)
-			item.set_meta("display_name", "Pastel horneado")
+			item.set_meta("display_name", res["name"])
 			item.set_meta(COOKING_PROGRESS_META, cook_time)
-			ItemVisuals.apply_ingredient_visual(item, "cake", "baked", 0.95)
-		elif item.get_meta("ingredient_type", "") == "bad_batter":
-			item.name = "cake"
-			item.set_meta("ingredient_type", "cake")
-			item.set_meta("state", "ruined_baked")
-			item.set_meta("is_cake", true)
-			item.set_meta("display_name", "Pastel fallido")
-			item.set_meta(COOKING_PROGRESS_META, cook_time)
-			ItemVisuals.apply_ingredient_visual(item, "cake", "ruined_baked", 0.95)
+			ItemVisuals.apply_ingredient_visual(item, res["type"], res["state"], 0.95)
 		else:
 			item.set_meta("state", "cooked")
 			item.set_meta(COOKING_PROGRESS_META, cook_time)
@@ -71,13 +79,37 @@ func _process(delta: float) -> void:
 		is_processing = false
 		item_burned.emit()
 		if item.has_meta("ingredient_type"):
-			var burn_scale := 0.95 if item.get_meta("ingredient_type", "") == "cake" else 0.45
-			ItemVisuals.apply_ingredient_visual(item, item.get_meta("ingredient_type"), "burned", burn_scale)
+			var burned_type: String = item.get_meta("ingredient_type", "")
+			var burn_scale := 0.95 if burned_type in ["cake", "giant_cake"] else 0.45
+			ItemVisuals.apply_ingredient_visual(item, burned_type, "burned", burn_scale)
 		if _progress_bar:
 			_progress_bar.show_bar(false)
 		return
 
 	_update_cook_bar()
+	_update_oven_visual()
+
+
+func _update_oven_visual() -> void:
+	if _oven_glow == null:
+		return
+	var mat := _oven_glow.material_override as StandardMaterial3D
+	if mat == null:
+		return
+	if is_burned:
+		var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.02)
+		mat.emission = GLOW_RED
+		mat.emission_energy_multiplier = lerpf(0.6, 2.2, pulse)
+	elif _item_cooked:
+		mat.emission = GLOW_GREEN
+		mat.emission_energy_multiplier = 0.9
+	elif is_cooking:
+		var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.006)
+		mat.emission = GLOW_ORANGE
+		mat.emission_energy_multiplier = lerpf(0.3, 1.4, pulse)
+	else:
+		mat.emission = GLOW_ORANGE
+		mat.emission_energy_multiplier = 0.08
 
 
 func _update_cook_bar() -> void:
@@ -113,6 +145,10 @@ func interact(player: ChefPlayer) -> void:
 		return
 
 	if not current_items.is_empty() and not player.has_item():
+		# Items pesados (pastel gigante): validar ANTES de sacarlo del horno,
+		# si no el item quedaria huerfano cuando el pickup falle.
+		if not player.can_lift(current_items[0]):
+			return
 		var item := take_item()
 		if item:
 			_store_interrupted_progress(item)
@@ -124,7 +160,7 @@ func can_cook(item: Node3D) -> bool:
 	if not item.has_meta("is_ingredient"):
 		return false
 	var ing_type: String = item.get_meta("ingredient_type", "")
-	if ing_type == "cake_batter" or ing_type == "bad_batter":
+	if BAKE_RESULTS.has(ing_type):
 		return item.get_meta("state", "") == "raw"
 	if ing_type == "bread" or ing_type == "lettuce":
 		return false

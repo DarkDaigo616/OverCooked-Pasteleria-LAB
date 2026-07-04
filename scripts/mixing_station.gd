@@ -4,6 +4,7 @@ class_name MixingStation
 @export var mix_time: float = 4.0
 
 var _progress_bar: ProgressBar3D
+var _whisk_node: Node3D
 
 const VALID_INGREDIENTS := ["flour", "egg"]
 const ACCEPTED_INGREDIENTS := ["flour", "egg", "sugar"]
@@ -14,6 +15,9 @@ func _ready() -> void:
 	station_name = "Batidora"
 	max_items = 2
 	_progress_bar = $ProgressBar3D if has_node("ProgressBar3D") else null
+	_whisk_node = find_child("StandMixer", true, false) as Node3D
+	if not _whisk_node:
+		_whisk_node = find_child("MixerWhisk", true, false) as Node3D
 
 
 func interact(player: ChefPlayer) -> void:
@@ -23,6 +27,8 @@ func interact(player: ChefPlayer) -> void:
 		return
 
 	if is_processing:
+		if try_rescue(player):
+			return
 		_show_station_message("Batidora ocupada.", false)
 		return
 
@@ -76,11 +82,20 @@ func start_mixing() -> void:
 		_progress_bar.set_progress(0.0, Color(0.38, 0.62, 0.92))
 
 
-func _on_processing(_delta: float) -> void:
+func _on_processing(delta: float) -> void:
+	_update_mixer_visual(delta)
 	if _progress_bar:
 		_progress_bar.set_progress(process_timer / mix_time, Color(0.38, 0.62, 0.92))
 	if process_timer >= mix_time:
 		_finish_mixing()
+
+
+func _update_mixer_visual(delta: float) -> void:
+	if _whisk_node == null or not is_processing:
+		return
+	var t := clampf(process_timer / maxf(mix_time, 0.01), 0.0, 1.0)
+	var speed := lerpf(180.0, 420.0, t)
+	_whisk_node.rotate_y(deg_to_rad(speed) * delta)
 
 
 func _finish_mixing() -> void:

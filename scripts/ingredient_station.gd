@@ -6,12 +6,15 @@ class_name IngredientStation
 @export var ingredient_size: Vector3 = Vector3(0.3, 0.3, 0.3)
 @export var ingredient_mesh_scale: float = 0.32
 @export var pickup_time: float = 1.0
+# El ingrediente creado sera pesado: requiere 2 chefs para cargarlo (Etapa 10).
+@export var heavy_ingredient: bool = false
 
 var _pending_player: ChefPlayer = null
 var _progress_bar: ProgressBar3D
 
 const INGREDIENT_DISPLAY_NAMES := {
 	"cake_batter": "Masa de pastel",
+	"giant_batter": "Masa gigante",
 	"flour": "Harina",
 	"egg": "Huevo",
 	"sugar": "Azucar",
@@ -41,8 +44,8 @@ func interact(player: ChefPlayer):
 
 	if pickup_time <= 0.0:
 		var new_ingredient := create_ingredient()
-		if new_ingredient:
-			player.pickup_item(new_ingredient)
+		if new_ingredient and not player.pickup_item(new_ingredient):
+			new_ingredient.queue_free()  # pesado sin ayudante: no dejarlo huerfano
 		return
 
 	_pending_player = player
@@ -88,8 +91,10 @@ func _finish_pickup() -> void:
 
 	var new_ingredient := create_ingredient()
 	if new_ingredient:
-		_pending_player.pickup_item(new_ingredient)
-		_show_station_message("%s listo." % _get_ingredient_display_name(), true)
+		if _pending_player.pickup_item(new_ingredient):
+			_show_station_message("%s listo." % _get_ingredient_display_name(), true)
+		else:
+			new_ingredient.queue_free()  # pesado sin ayudante cerca
 	_pending_player = null
 
 
@@ -103,6 +108,8 @@ func create_ingredient() -> Node3D:
 	ingredient.set_meta("state", "raw")
 	ingredient.set_meta("is_ingredient", true)
 	ingredient.set_meta("display_name", _get_ingredient_display_name())
+	if heavy_ingredient:
+		ingredient.set_meta("heavy", true)
 
 	var static_body := StaticBody3D.new()
 	static_body.collision_layer = PhysicsLayers.ITEMS

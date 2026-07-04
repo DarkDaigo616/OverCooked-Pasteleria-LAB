@@ -36,6 +36,22 @@ const RECIPES := {
 		"required": [{"type": "cake", "state": "decorated_strawberry"}],
 		"book_image": "pastel_fresa.png",
 	},
+	# ── Recetas cooperativas (Etapa 10) ──
+	# "requirements" es declarativo: la receta describe QUE necesita y el motor
+	# lo interpreta (HUD, mecanicas). Las mecanicas en si (heavy, sync, rescate)
+	# se declaran donde actuan: el item (meta "heavy") y la estacion (layout).
+	"giant": {
+		"name": "Pastel gigante",
+		"required": [{"type": "giant_cake", "state": "baked"}],
+		"book_image": "pastel_gigante.png",
+		"requirements": {"two_player": true, "heavy_carry": true},
+	},
+	"wedding": {
+		"name": "Pastel de boda",
+		"required": [{"type": "cake", "state": "decorated_wedding"}],
+		"book_image": "pastel_boda.png",
+		"requirements": {"two_player": true, "sync_station": true, "long_chain": true},
+	},
 }
 
 
@@ -56,6 +72,13 @@ static func book_image_path(id: String) -> String:
 	return BOOK_BASE + img
 
 
+## Requisitos cooperativos declarados por la receta (two_player, heavy_carry,
+## sync_station...). El HUD y las mecanicas los consultan; {} si no declara.
+static func get_requirements(id: String) -> Dictionary:
+	var entry: Dictionary = RECIPES.get(id, {})
+	return entry.get("requirements", {})
+
+
 ## Construye una instancia de Recipe a partir del id del catalogo, con los
 ## puntos y el tiempo que fije el nivel.
 static func make_recipe(id: String, points: int, time: float) -> Recipe:
@@ -63,12 +86,14 @@ static func make_recipe(id: String, points: int, time: float) -> Recipe:
 	if entry.is_empty():
 		push_warning("RecipeCatalog: receta desconocida '%s'" % id)
 		return Recipe.new(id.capitalize(), [], points, time)
-	return Recipe.new(
+	var recipe := Recipe.new(
 		entry["name"],
 		_duplicate_required(entry["required"]),
 		points,
 		time
 	)
+	recipe.recipe_id = id
+	return recipe
 
 
 static func _duplicate_required(required: Array) -> Array:
